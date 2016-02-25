@@ -63,7 +63,7 @@
 
 /* Copy the first part of user declarations.  */
 /* Line 371 of yacc.c  */
-#line 1 "snazzle.y"
+#line 1 "slang.y"
 
 #include <stdlib.h>
 #include <string.h>
@@ -81,7 +81,7 @@ struct slang_node* g_slang_root;
 
 
 /* Line 371 of yacc.c  */
-#line 85 "snazzle.tab.c"
+#line 85 "slang.tab.c"
 
 # ifndef YY_NULL
 #  if defined __cplusplus && 201103L <= __cplusplus
@@ -100,9 +100,9 @@ struct slang_node* g_slang_root;
 #endif
 
 /* In a future release of Bison, this section will be replaced
-   by #include "snazzle.tab.h".  */
-#ifndef YY_YY_SNAZZLE_TAB_H_INCLUDED
-# define YY_YY_SNAZZLE_TAB_H_INCLUDED
+   by #include "slang.tab.h".  */
+#ifndef YY_YY_SLANG_TAB_H_INCLUDED
+# define YY_YY_SLANG_TAB_H_INCLUDED
 /* Enabling traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -144,12 +144,12 @@ int yyparse ();
 #endif
 #endif /* ! YYPARSE_PARAM */
 
-#endif /* !YY_YY_SNAZZLE_TAB_H_INCLUDED  */
+#endif /* !YY_YY_SLANG_TAB_H_INCLUDED  */
 
 /* Copy the second part of user declarations.  */
 
 /* Line 390 of yacc.c  */
-#line 153 "snazzle.tab.c"
+#line 153 "slang.tab.c"
 
 #ifdef short
 # undef short
@@ -1323,13 +1323,13 @@ yyreduce:
     {
         case 2:
 /* Line 1792 of yacc.c  */
-#line 26 "snazzle.y"
+#line 26 "slang.y"
     { g_slang_root = new_slang_node(TRANSLATION_UNIT, NULL); }
     break;
 
 
 /* Line 1792 of yacc.c  */
-#line 1333 "snazzle.tab.c"
+#line 1333 "slang.tab.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -1561,7 +1561,7 @@ yyreturn:
 
 
 /* Line 2055 of yacc.c  */
-#line 28 "snazzle.y"
+#line 28 "slang.y"
 
 
 void yyerror (char const *s) {

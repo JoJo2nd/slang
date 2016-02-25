@@ -489,8 +489,8 @@ int yy_flex_debug = 0;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "snazzle.l"
-#line 2 "snazzle.l"
+#line 1 "slang.l"
+#line 2 "slang.l"
 #include "snazzle.tab.h"  // to get the token types that we return
 #line 496 "lex.yy.c"
 
@@ -674,7 +674,7 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 4 "snazzle.l"
+#line 4 "slang.l"
 
 
 #line 681 "lex.yy.c"
@@ -762,62 +762,62 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 6 "snazzle.l"
+#line 6 "slang.l"
 reentrant
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 7 "snazzle.l"
+#line 7 "slang.l"
 bison-bridge
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 8 "snazzle.l"
+#line 8 "slang.l"
 bison-locations
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 9 "snazzle.l"
+#line 9 "slang.l"
 yylineno
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 10 "snazzle.l"
+#line 10 "slang.l"
 noyywrap
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 13 "snazzle.l"
+#line 13 "slang.l"
 [ \t]+
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 14 "snazzle.l"
+#line 14 "slang.l"
 [0-9]
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 15 "snazzle.l"
+#line 15 "slang.l"
 [_a-zA-Z]
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 16 "snazzle.l"
+#line 16 "slang.l"
 {nondigit}({nondigit}|{digit})*
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 17 "snazzle.l"
+#line 17 "slang.l"
 {digit}+
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 18 "snazzle.l"
+#line 18 "slang.l"
 {digit}+\.{digit}+
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 20 "snazzle.l"
+#line 20 "slang.l"
 ECHO;
 	YY_BREAK
 #line 824 "lex.yy.c"
@@ -1814,7 +1814,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 19 "snazzle.l"
+#line 19 "slang.l"
 
 
 
