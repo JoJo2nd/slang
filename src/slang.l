@@ -1,9 +1,14 @@
 %{
-#include "snazzle.tab.h"  // to get the token types that we return
-%}
-%%
 
-%option reentrant
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "slang.tab.h"  // to get the token types that we return
+
+#define YYSTYPE SLANG_STYPE
+#define YYLTYPE SLANG_LTYPE
+
+%}
 
 whitespace          [ \t]+
 digit               [0-9]
@@ -15,11 +20,10 @@ floating_constant   {digit}+\.{digit}+
 %%
 
 void        return VOID;
+
 const       return CONST;
 cbuffer     return CBUFFER;
-// Buffer<float4>
 Buffer      return BUFFER;
-// Scalar types
 bool        return BOOL;
 bool2       return BOOL2;
 bool3       return BOOL3;
@@ -99,13 +103,10 @@ double3x4   return DOUBLE3X4;
 double4x2   return DOUBLE4X2;
 double4x3   return DOUBLE4X3;
 double4x4   return DOUBLE4X4;
-// TODO: to min types e.g. min10float
 
-// Vector types
 vector      return VECTOR;
 matrix      return MATRIX;
 
-// sampler
 sampler     return SAMPLER;
 sampler1D   return SAMPLER1D;
 sampler2D   return SAMPLER2D;
@@ -114,7 +115,6 @@ samplerCUBE return SAMPLERCUBE;
 SamplerState return SAMPLERSTATE;
 sampler_state return SAMPLER_STATE;
 
-// texture types
 texture1D   return TEXTURE1D;
 texture1DArray return TEXTURE1DARRAY;
 texture2D   return TEXTURE2D;
@@ -125,7 +125,6 @@ textureCube return TEXTURECUBE;
 
 struct return STRUCT;
 
-// Interpolation modifiers
 linear  return LINEAR_MODIFIER;
 centroid return CENTROID_MODIFIER;
 nointerpolation return NOINTERPOLATION_MODIFIER;
@@ -184,7 +183,8 @@ typedef return TYPEDEF;
 true            { return TRUE_VALUE; }
 false           { return FALSE_VALUE; }
 
-{identifier}        { (*yylval).IDENTIFIER = strdup(yytext); return IDENTIFIER; }
-{integer_constant}  { (*yylval).INTCONSTANT = atoi(yytext); return INTCONSTANT; }
-{floating_constant} { (*yylval).FLOATCONSTANT = atof(yytext); return FLOATCONSTANT; }
+{identifier}        { yylval.ident = strdup(yytext); return IDENTIFIER; }
+{integer_constant}  { yylval.intConst = atoi(yytext); return INTCONSTANT; }
+{floating_constant} { yylval.floatConst = atof(yytext); return FLOATCONSTANT; }
 
+%%

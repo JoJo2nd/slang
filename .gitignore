@@ -1,1 +1,5 @@
 build/
+src/*.tab.h
+src/*.tab.c
+src/*.yy.h
+src/*.yy.c

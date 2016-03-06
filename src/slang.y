@@ -4,36 +4,68 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "getopt.h"
+#include "slang.tab.h"
+// move node into header
+#include "slang.yy.h"
 
 // stuff from flex that bison needs to know about:
 extern int yylex();
 extern int yyparse();
 extern void yyerror(char const *);
-extern FILE *yyin;
 
-struct slang_node* g_slang_root;
+typedef struct slang_node {
+	int tokentype;
+	char* ident;
+} slang_node_t;
+
+
+slang_node_t* g_slang_root;
+
+slang_node_t* new_slang_node(int code, ...)
+{
+	slang_node_t* temp = malloc(sizeof(slang_node_t));;
+	temp->tokentype = code;
+	return temp;
+}
+
+slang_node_t* new_slang_identifier(const char* ident)
+{
+	slang_node_t* temp = malloc(sizeof(slang_node_t));;
+	temp->tokentype = IDENTIFIER;
+	return temp;
+}
 
 %}
 
-%defines
+//%defines
 
 // prefix generated functions
-%define api.prefix slang_
+//%define api.prefix slang_
 // make the parser re-entrant
-%define api.pure full
+//%define api.pure full
 
-%type <struct slang_node*> root
+//%parse-param { void * scanner }
+//%lex-param { void * scanner }
+//%locations
+
+%union {
+	struct slang_node* node;
+	char* ident;
+	int intConst;
+	float floatConst;
+}
+
+%type <node> root
 //%type <struct slang_node*> variable_modifier
-%type <struct slang_node*> variable_identifier
-%type <struct slang_node*> variable_decl
-%type <struct slang_node*> type_specifier
-%type <struct slang_node*> full_type_specifier
+%type <node> variable_identifier
+%type <node> variable_decl
+%type <node> type_specifier
+%type <node> full_type_specifier
 
-
-%token <char *> IDENTIFIER
+%token <ident> IDENTIFIER
 %token <float> FLOATCONSTANT
 %token <double> DOUBLECONSTANT
-%token <int> INTCONSTANT
+%token <intConst> INTCONSTANT
 %token <unsigned int> UINTCONSTANT
 %token TRUE_VALUE
 %token FALSE_VALUE
@@ -291,7 +323,7 @@ full_type_specifier
     ;
 
 variable_identifier 
-    : IDENTIFIER { $$ = new_glsl_identifier($1); }
+    : IDENTIFIER { $$ = new_slang_identifier($1); }
     ;
 
 //variable_modifier
@@ -302,7 +334,6 @@ variable_decl
     : full_type_specifier variable_identifier SEMICOLON { $$ = new_slang_node(VARIABLE_DECL, $1, $2); } 
     // TODO: |  type_specifier variable_identifier EQUALS type_specifier LEFT_PAREN expression RIGHT_PAREN  SEMICOLON
     ;
-
 
 %%
 
@@ -341,7 +372,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    /* For any remaining command line arguments (not options). */
+    /* For any remaining command line arguments (not options). 
     while (optind < argc) {
         yyin = fopen(argv[optind], "rb");
         break;
@@ -352,11 +383,12 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Cannot open input file %s", argv[optind]);
         exit(-2);
     }
+	*/
 
     // parse through the input until there is no more:
-    do {
-        yyparse();
-    } while (!feof(yyin));
+    //do {
+    //    slang_parse();
+    //} while (!feof(yyin));
 
-    fclose(yyin);
+    //fclose(yyin);
 }
