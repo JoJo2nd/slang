@@ -3,12 +3,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "slang.tab.h"  // to get the token types that we return
+#include "slang.h"
+
+
+#define YY_EXTRA_TYPE slang_parse_context_t*
+#define YY_USER_ACTION yylloc->first_line = yylineno;
 
 #define YYSTYPE SLANG_STYPE
 #define YYLTYPE SLANG_LTYPE
 
+#include "slang.tab.h"
+
+int slang_get_lineno (yyscan_t yyscanner );
+int slang_get_column  (yyscan_t yyscanner );
+
+int slang_lex(SLANG_STYPE* lvalp, SLANG_LTYPE* llocp, void* scanner);
+void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) {
+	fprintf(stderr, "ERROR: %s:(%d:%d)", err, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
+}
+
+#ifdef _MSC_VER
+#   pragma warning( disable : 4996 )
+#endif
+
 %}
+
+/*prefix with slang_ instead of yy*/
+%option prefix="slang_"
+/*Generate yylval*/
+%option bison-bridge bison-locations
+/*Easy to guess but changes API*/
+%option reentrant
+%option noyywrap
+/* Want line no support*/
+%option yylineno
 
 whitespace          [ \t]+
 digit               [0-9]
@@ -183,8 +211,8 @@ typedef return TYPEDEF;
 true            { return TRUE_VALUE; }
 false           { return FALSE_VALUE; }
 
-{identifier}        { yylval.ident = strdup(yytext); return IDENTIFIER; }
-{integer_constant}  { yylval.intConst = atoi(yytext); return INTCONSTANT; }
-{floating_constant} { yylval.floatConst = atof(yytext); return FLOATCONSTANT; }
+{identifier}        { yylval->ident = strdup(yytext); return IDENTIFIER; }
+{integer_constant}  { yylval->intConst = atoi(yytext); return INTCONSTANT; }
+{floating_constant} { yylval->floatConst = atof(yytext); return FLOATCONSTANT; }
 
 %%
