@@ -35,6 +35,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> variable_decl
 %type <node> type_specifier
 %type <node> full_type_specifier
+%type <node> statement
+%type <node> statement_list
 
 %token <ident> IDENTIFIER
 %token <float> FLOATCONSTANT
@@ -200,14 +202,24 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token EQUAL
 %token AMPERSAND
 %token QUESTION
+%token STATEMENT_BLOCK
 
 //%start root
 
 %%
 
 root 
-    : variable_decl
+    : statement_list { context->root = $1; }
     ;
+
+statement_list
+	: statement { $$ = new_slang_node(STATEMENT_BLOCK); slang_node_attach_child($$, $1); }
+	| statement_list statement { slang_node_attach_child($1, $2); }
+	;
+
+statement 
+	: variable_decl { $$ = $1; }
+	;
 
 type_specifier 
     : VOID { $$ = new_slang_node(VOID); }
@@ -292,7 +304,7 @@ type_specifier
     ;
 
 full_type_specifier
-    : type_specifier { $$ = new_slang_node(TYPE_SPECIFIER, $1); }
+    : type_specifier { $$ = new_slang_node(TYPE_SPECIFIER); slang_node_attach_child($$, $1); }
     //| variable_modifier type_specifier
     ;
 
@@ -305,7 +317,7 @@ variable_identifier
 //    ;
 
 variable_decl
-    : full_type_specifier variable_identifier SEMICOLON { $$ = new_slang_node(VARIABLE_DECL, $1, $2); } 
+    : full_type_specifier variable_identifier SEMICOLON { $$ = new_slang_node(VARIABLE_DECL); slang_node_attach_child($$, $1); slang_node_attach_child($$, $2);} 
     // TODO: |  type_specifier variable_identifier EQUALS type_specifier LEFT_PAREN expression RIGHT_PAREN  SEMICOLON
     ;
 
