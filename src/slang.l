@@ -50,6 +50,24 @@ floating_constant   {digit}+\.{digit}+
 void        return VOID;
 
 const       return CONST;
+static		return STATIC;
+
+for			return FOR;
+if			return IF;
+else		return ELSE;
+do			return DO;
+while		return WHILE;
+
+switch		return SWITCH;
+case		return CASE;
+default		return DEFAULT;
+
+break		return BREAK;
+continue	return CONTINUE;
+discard		return DISCARD;
+
+return		return RETURN;
+
 cbuffer     return CBUFFER;
 Buffer      return BUFFER;
 bool        return BOOL;
