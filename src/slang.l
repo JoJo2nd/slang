@@ -233,4 +233,6 @@ false           { return FALSE_VALUE; }
 {integer_constant}  { yylval->intConst = atoi(yytext); return INTCONSTANT; }
 {floating_constant} { yylval->floatConst = atof(yytext); return FLOATCONSTANT; }
 
+\n					{ ++yyg->yylineno_r; }
+
 %%

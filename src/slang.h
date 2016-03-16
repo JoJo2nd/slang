@@ -2,6 +2,9 @@
 
 #include <stdio.h>
 
+#define slang_trap __debugbreak()
+#define slang_assert(x) if (!(x)) slang_trap;
+
 typedef struct slang_node {
     int tokentype;
     union {
@@ -28,3 +31,6 @@ slang_node_t* new_slang_int_constant(int int_str);
 slang_node_t* new_slang_float_constant(float float_str);
 void slang_node_attach_child(slang_node_t* parent, slang_node_t* child);
 void slang_node_attach_children(slang_node_t* parent, ...);
+
+//Here, but only temp
+void print_slang_AST(slang_node_t* ast_root, FILE* out);

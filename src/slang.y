@@ -39,6 +39,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %parse-param { slang_parse_context_t* context }
 %lex-param { void * scanner }
 %locations
+// easier debugging (...sometimes)
+//%no-lines
 
 %union {
 	struct slang_node* node;
@@ -56,6 +58,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> identifier_list parameter_type_list type_name abstract_declarator direct_abstract_declarator init_declarator_list
 %type <node> parameter_list parameter_declaration init_declarator argument_expression_list specifier_qualifier_list 
 %type <node> expression_statement selection_statement iteration_statement jump_statement labeled_statement constant_expression
+%type <node> struct_or_cbuffer_specifier struct_or_cbuffer struct_declaration_list struct_declarator_list struct_declaration 
+%type <node> struct_declarator type_specifier_identifier
 
 %token <ident> IDENTIFIER
 %token <floatConst> FLOATCONSTANT
@@ -336,6 +340,37 @@ initializer_list
 	| initializer_list COMMA initializer { $$ = $1; slang_node_attach_child($1, $3); }
 	;
 
+struct_or_cbuffer_specifier
+    : struct_or_cbuffer LEFT_BRACE struct_declaration_list RIGHT_BRACE { $$ = $1; slang_node_attach_child($1, $3); }
+    | struct_or_cbuffer IDENTIFIER LEFT_BRACE struct_declaration_list RIGHT_BRACE { $$ = $1; slang_node_attach_children($1, new_slang_identifier($2), $4, NULL); }
+    | struct_or_cbuffer IDENTIFIER { $$ = $1; slang_node_attach_child($1, new_slang_identifier($2)); }
+    ;
+
+struct_or_cbuffer
+    : STRUCT { $$ = new_slang_node(STRUCT); }
+    | CBUFFER { $$ = new_slang_node(CBUFFER); }
+    ;
+
+struct_declaration_list
+    : struct_declaration { $$ = $1; }
+    | struct_declaration_list struct_declaration { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+struct_declaration
+    : specifier_qualifier_list struct_declarator_list SEMICOLON { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+struct_declarator_list
+    : struct_declarator { $$ = $1; }
+    | struct_declarator_list COMMA struct_declarator { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+struct_declarator
+    : COLON constant_expression { $$ = $2; }
+    | declarator COLON constant_expression { $$ = $1; slang_node_attach_child($1, $3); }
+    | declarator { $$ = $1; }
+    ;
+
 type_qualifier
 	: CONST { $$ = new_slang_node(CONST); }
 	;
@@ -353,6 +388,10 @@ storage_class_specifier
 	| NOPERSPECTIVE_MODIFIER { $$ = new_slang_node(NOPERSPECTIVE_MODIFIER); }
 	| SAMPLE_MODIFIER { $$ = new_slang_node(SAMPLE_MODIFIER); }
 	;
+
+type_specifier_identifier
+    : IDENTIFIER { $$ = new_slang_identifier($1); }
+    ;
 
 type_specifier
     : VOID { $$ = new_slang_node(VOID); }
@@ -434,6 +473,8 @@ type_specifier
     | DOUBLE4X2 { $$ = new_slang_node(DOUBLE4X2); }
     | DOUBLE4X3 { $$ = new_slang_node(DOUBLE4X3); }
     | DOUBLE4X4 { $$ = new_slang_node(DOUBLE4X4); }
+    | struct_or_cbuffer_specifier
+    //| type_specifier_identifier
     ;
 
 assignment_operator
@@ -685,11 +726,6 @@ jump_statement
 	| BREAK SEMICOLON { $$ = new_slang_node(BREAK); }
 	| RETURN SEMICOLON { $$ = new_slang_node(RETURN); }
 	| RETURN expression SEMICOLON { $$ = new_slang_node(RETURN); slang_node_attach_child($$, $2);}
-	;
-
-expression
-	: assignment_expression { $$ = $1; }
-	| expression COLON assignment_expression { $$ = $1; slang_node_attach_child($1, $3); }
 	;
 
 constant_expression

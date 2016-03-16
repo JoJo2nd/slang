@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    slang_parse_context_t context;
+    slang_parse_context_t context = {0};
 
     slang_lex_init(&context.scanner);
     // For any remaining command line arguments (not options). 
@@ -56,4 +56,10 @@ int main(int argc, char** argv) {
     } while (!feof(context.fin));
 
     fclose(context.fin);
+
+    FILE* f_out = fopen("out.a", "wb");
+    if (f_out) {
+        print_slang_AST(context.root, f_out);
+        fclose(f_out);
+    }
 }
