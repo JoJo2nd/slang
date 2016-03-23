@@ -18,9 +18,7 @@ int slang_get_lineno (yyscan_t yyscanner );
 int slang_get_column  (yyscan_t yyscanner );
 
 int slang_lex(SLANG_STYPE* lvalp, SLANG_LTYPE* llocp, void* scanner);
-void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) {
-	fprintf(stderr, "ERROR: %s:(%d:%d)", err, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
-}
+void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err);
 
 #ifdef _MSC_VER
 #   pragma warning( disable : 4996 )
@@ -38,7 +36,9 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 /* Want line no support*/
 %option yylineno
 
-whitespace          [ \t]+
+ES                  (\\(['"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
+WS                  [ \t\v\n\f]
+whitespace          {WS}+
 digit               [0-9]
 nondigit            [_a-zA-Z]
 identifier          {nondigit}({nondigit}|{digit})*
@@ -47,10 +47,65 @@ floating_constant   {digit}+\.{digit}+
 
 %%
 
-void        return VOID;
+"//".*                                    { /* consume //-comment TODO: /* style comments... */ }
 
-const       return CONST;
-static		return STATIC;
+(\"([^"\\\n]|{ES})*\"{WS}*)+   { yylval->strLiteral = strdup(yytext); return STRING_LITERAL; }
+
+vs return VS;
+ps return PS;
+gs return GS;
+ds return DS;
+hs return HS;
+cs_4_0 return CS_4_0;   
+cs_4_1 return CS_4_1;   
+cs_5_0 return CS_5_0;   
+ds_5_0 return DS_5_0;   
+gs_4_0 return GS_4_0;   
+gs_4_1 return GS_4_1;   
+gs_5_0 return GS_5_0;   
+hs_5_0 return HS_5_0;   
+lib_4_0 return LIB_4_0;  
+lib_4_1 return LIB_4_1;   
+lib_4_0_level_9_1 return LIB_4_0_LEVEL_9_1;   
+lib_4_0_level_9_3 return LIB_4_0_LEVEL_9_3;   
+lib_5_0 return LIB_5_0;   
+ps_2_0 return PS_2_0;   
+ps_2_a return PS_2_A;   
+ps_2_b return PS_2_B;  
+ps_2_sw return PS_2_SW;   
+ps_3_0 return PS_3_0;   
+ps_3_sw return PS_3_SW;   
+ps_4_0 return PS_4_0;   
+ps_4_0_level_9_1 return PS_4_0_LEVEL_9_1;   
+ps_4_0_level_9_3 return PS_4_0_LEVEL_9_3;  
+ps_4_0_level_9_0 return PS_4_0_LEVEL_9_0;   
+ps_4_1 return PS_4_1;   
+ps_5_0 return PS_5_0;   
+tx_1_0 return TX_1_0;   
+vs_1_1 return VS_1_1;   
+vs_2_0 return VS_2_0;   
+vs_2_a return VS_2_A;   
+vs_2_sw return VS_2_SW;  
+vs_3_0 return VS_3_0;   
+vs_3_sw return VS_3_SW;   
+vs_4_0 return VS_4_0;   
+vs_4_0_level_9_1 return VS_4_0_LEVEL_9_1;   
+vs_4_0_level_9_3 return VS_4_0_LEVEL_9_3;   
+vs_4_0_level_9_0 return VS_4_0_LEVEL_9_0;  
+vs_4_1 return VS_4_1;   
+vs_5_0 return VS_5_0;  
+
+x           return SWIZZLEMASK_X___;
+y           return SWIZZLEMASK__Y__;
+z           return SWIZZLEMASK___Z_;
+w           return SWIZZLEMASK____W;
+
+r           return SWIZZLEMASK_R___;
+g           return SWIZZLEMASK__G__;
+b           return SWIZZLEMASK___B_;
+a           return SWIZZLEMASK____A;
+
+void        return VOID;
 
 for			return FOR;
 if			return IF;
@@ -68,7 +123,6 @@ discard		return DISCARD;
 
 return		return RETURN;
 
-cbuffer     return CBUFFER;
 Buffer      return BUFFER;
 bool        return BOOL;
 bool2       return BOOL2;
@@ -150,6 +204,8 @@ double4x2   return DOUBLE4X2;
 double4x3   return DOUBLE4X3;
 double4x4   return DOUBLE4X4;
 
+string      return STRING;
+
 vector      return VECTOR;
 matrix      return MATRIX;
 
@@ -169,15 +225,32 @@ texture3D   return TEXTURE3D;
 texture3DArray return TEXTURE3DARRAY;
 textureCube return TEXTURECUBE;
 
-struct return STRUCT;
+struct   return STRUCT;
+cbuffer  return CBUFFER;
+tbuffer  return TBUFFER;
 
-linear  return LINEAR_MODIFIER;
-centroid return CENTROID_MODIFIER;
-nointerpolation return NOINTERPOLATION_MODIFIER;
-noperspective return NOPERSPECTIVE_MODIFIER;
-sample return SAMPLE_MODIFIER;
+extern return EXTERN;
+precise return PRECISE;
+shared return SHARED;
+groupshared return GROUPSHARED;
+static return STATIC;
+uniform return UNIFORM;
+volatile return VOLATILE;
+
+const return CONST;
+row_major return ROW_MAJOR;
+column_major return COLUMN_MAJOR;
+
+linear  return LINEAR;
+centroid return CENTROID;
+nointerpolation return NOINTERPOLATION;
+noperspective return NOPERSPECTIVE;
+sample return SAMPLE;
 
 typedef return TYPEDEF;
+
+register return REGISTER;
+packoffset return PACKOFFSET;
 
 \<\< return LEFT_OP;
 \>\> return RIGHT_OP;
@@ -201,30 +274,30 @@ typedef return TYPEDEF;
 \|\= return OR_ASSIGN;
 \-\= return SUB_ASSIGN;
 
-\+ return PLUS;
-\- return DASH;
-\% return PERCENT;
-\* return STAR;
-\/ return SLASH;
-\~ return TILDE;
-\! return BANG;
-\^ return CARET;
-\( return LEFT_PAREN;
-\) return RIGHT_PAREN;
-\{ return LEFT_BRACE;
-\} return RIGHT_BRACE;
-\; return SEMICOLON;
-\< return LEFT_ANGLE;
-\> return RIGHT_ANGLE;
-\. return DOT;
-\, return COMMA;
-\[ return LEFT_BRACKET;
-\] return RIGHT_BRACKET;
-\| return VERTICAL_BAR;
-\: return COLON;
-\= return EQUAL;
-\& return AMPERSAND;
-\? return QUESTION;
+\+ return '+';
+\- return '-';
+\% return '%';
+\* return '*';
+\/ return '/';
+\~ return '~';
+\! return '!';
+\^ return '^';
+\( return '(';
+\) return ')';
+\{ return '{';
+\} return '}';
+\; return ';';
+\< return '<';
+\> return '>';
+\. return '.';
+\, return ',';
+\[ return '[';
+\] return ']';
+\| return '|';
+\: return ':';
+\= return '=';
+\& return '&';
+\? return '?';
 
 true            { return TRUE_VALUE; }
 false           { return FALSE_VALUE; }
@@ -234,5 +307,11 @@ false           { return FALSE_VALUE; }
 {floating_constant} { yylval->floatConst = atof(yytext); return FLOATCONSTANT; }
 
 \n					{ ++yyg->yylineno_r; }
+.                   { /* discard bad characters */ }
 
 %%
+
+void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) 
+{
+    fprintf(stderr, "ERROR: %s:(%d:%d)", err, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
+}

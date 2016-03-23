@@ -57,9 +57,13 @@ int main(int argc, char** argv) {
 
     fclose(context.fin);
 
-    FILE* f_out = fopen("out.a", "wb");
-    if (f_out) {
-        print_slang_AST(context.root, f_out);
-        fclose(f_out);
+    if (context.root) {
+        slang_node_t* fake_root = new_slang_node(TRANSLATION_UNIT);
+        slang_node_attach_child(fake_root, context.root);
+        FILE* f_out = fopen("out.a", "wb");
+        if (f_out) {
+            print_slang_AST(fake_root, f_out);
+            fclose(f_out);
+        }
     }
 }
