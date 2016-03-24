@@ -141,6 +141,35 @@ slang_node_t* new_slang_var_decl(
     return vd;
 }
 
+slang_node_t* new_slang_struct_decl(slang_node_t* identifier, slang_node_t* member_list) {
+    slang_node_t* sd = init_slang_node(malloc(sizeof(slang_node_t)));
+    sd->tokentype = STRUCT;
+    if (identifier) {
+        sd->structDecl.identifier = identifier;
+        slang_node_attach_child(sd, identifier);
+    }
+    if (member_list) {
+        sd->structDecl.memberList = member_list;
+        slang_node_attach_child(sd, member_list);
+    }
+    return sd;
+}
+
+slang_node_t* new_slang_struct_member_decl(slang_node_t* type_specifier, slang_node_t* identifier, slang_node_t* semantic) {
+    slang_node_t* smd = init_slang_node(malloc(sizeof(slang_node_t)));
+    slang_assert(type_specifier && identifier);
+    smd->tokentype = STRUCT_MEMBER_DECL;
+    smd->structMemberDecl.typeSpecifiers = type_specifier;
+    slang_node_attach_child(smd, type_specifier);
+    smd->structMemberDecl.identifier = identifier;
+    slang_node_attach_child(smd, identifier);
+    if (semantic) {
+        smd->structMemberDecl.semantic = semantic;
+        slang_node_attach_child(smd, semantic);
+    }
+    return smd;
+}
+
 slang_node_t* new_slang_cbuffer_tbuffer_decl(
     slang_node_t* identifier,
     slang_node_t* register_node,
@@ -171,7 +200,7 @@ slang_node_t* new_slang_buffer_member_decl(
     bmd->tokentype = BUFFER_MEMBER_DECLARATION;
     slang_assert(type_specifier && identifier);
     slang_node_attach_child(bmd, type_specifier);
-    bmd->bufferMemberDecl.typeSpecifier = type_specifier;
+    bmd->bufferMemberDecl.typeSpecifiers = type_specifier;
     slang_node_attach_child(bmd, identifier);
     bmd->bufferMemberDecl.identifier = identifier;
     if (semantic) {
@@ -421,17 +450,21 @@ static const char* token_type_name [] = {
      "FUNCTION_DEFINITION", // = 471,
      "ANNOTATION_LIST", // = 472,
      "INITIALIZER_LIST", // = 473,
-     "STRUCT_MEMBER_DECLARATION_LIST", // = 474,
+     "BUFFER_MEMBER_DECLARATION_LIST", // = 474,
      "VARIABLE_DECL", // = 475,
      "CBUFFER_TBUFFER_DECL", // = 476,
      "BUFFER_MEMBER_DECLARATION", // = 477,
-     "TYPE_SPECIFIER", // = 478,
-     "STATEMENT_BLOCK", // = 479,
-     "SEMANTIC", // = 480,
-     "TYPEDEF_NAME", // = 481,
-     "ENUMERATION_CONSTANT", // = 482,
-     "TERNARY_OPERATOR", // = 483,
-     "NULL_NODE", // = 484
+     "STRUCT_DECL", // = 478,
+     "STRUCT_MEMBER_DECL", // = 479,
+     "STRUCT_INTERPOLATION_MODIFIER_LIST", // = 480,
+     "STRUCT_MEMBER_DECLARATION_LIST", // = 481,
+     "TYPE_SPECIFIER", // = 482,
+     "STATEMENT_BLOCK", // = 483,
+     "SEMANTIC", // = 484,
+     "TYPEDEF_NAME", // = 485,
+     "ENUMERATION_CONSTANT", // = 486,
+     "TERNARY_OPERATOR", // = 487,
+     "NULL_NODE", // = 488
 };
 
 void print_slang_node_and_children(slang_node_t* ast_node, FILE* out) {

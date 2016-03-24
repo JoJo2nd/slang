@@ -75,7 +75,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> annotations full_annotation_type_specifier annotation_type_specifier annotation_declaration_list annotation_declaration annotation_declaration_assignment annotation_initializer_list annotation_initializer
 %type <node> cbuffer_or_tbuffer_declaration cbuffer_or_tbuffer
 %type <node> interpolation_modifier interpolation_modifier_list 
-%type <node> full_struct_member_type_specifier struct_member_declaration struct_member_declaration_list 
+%type <node> full_buffer_member_type_specifier buffer_member_declaration buffer_member_declaration_list 
+%type <node> struct_declarator struct_declaration struct_interpolation_modifier_list struct_interpolation_modifier struct_member_declaration_list struct_member_declaration full_struct_member_type_specifier struct_member_type_order_specifier
 
 %token <ident> IDENTIFIER
 %token <floatConst> FLOATCONSTANT
@@ -306,9 +307,11 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token FUNCTION_DEFINITION
 %token ANNOTATION_LIST
 %token INITIALIZER_LIST
-%token STRUCT_MEMBER_DECLARATION_LIST
+%token BUFFER_MEMBER_DECLARATION_LIST
 
-%token VARIABLE_DECL CBUFFER_TBUFFER_DECL BUFFER_MEMBER_DECLARATION
+%token VARIABLE_DECL CBUFFER_TBUFFER_DECL BUFFER_MEMBER_DECLARATION 
+%token STRUCT_DECL STRUCT_MEMBER_DECL
+%token STRUCT_INTERPOLATION_MODIFIER_LIST STRUCT_MEMBER_DECLARATION_LIST
 
 %token TYPE_SPECIFIER
 %token STATEMENT_BLOCK
@@ -334,6 +337,7 @@ external_declaration
 
 declaration
     : variable_declaration { $$ = $1; }
+    | struct_declaration { $$ = $1; }
     | cbuffer_or_tbuffer_declaration { $$ = $1; }
     ;
 
@@ -360,6 +364,7 @@ variable_declaration
 
 full_type_specifier
     : storage_class_list type_modifier_list type_specifier { $$ = $1; slang_node_attach_children($1, $2, $3, NULL); }
+    | type_modifier_list storage_class_list type_specifier { $$ = $1; slang_node_attach_children($1, $2, $3, NULL); }
     | storage_class_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
     | type_modifier_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
     | type_specifier { $$ = $1; }
@@ -378,7 +383,7 @@ storage_class
     | GROUPSHARED { $$ = new_slang_node(GROUPSHARED); }
     | STATIC { $$ = new_slang_node(STATIC); }
     | UNIFORM { $$ = new_slang_node(UNIFORM); }
-    | VOLATILE {} // volatile is ignored by HLSL 
+    | VOLATILE { $$ = new_slang_node(UNIFORM); } // volatile is ignored by HLSL but we output put it anyway
     ;
 
 type_modifier_list
@@ -467,9 +472,9 @@ annotation_initializer
 
 cbuffer_or_tbuffer_declaration
     : cbuffer_or_tbuffer IDENTIFIER register_list '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), $3, NULL); }
-    | cbuffer_or_tbuffer IDENTIFIER register_list '{' struct_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), $3, $5); }
+    | cbuffer_or_tbuffer IDENTIFIER register_list '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), $3, $5); }
     | cbuffer_or_tbuffer IDENTIFIER '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, NULL); }
-    | cbuffer_or_tbuffer IDENTIFIER '{' struct_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, $4); }
+    | cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, $4); }
     ;
 
 cbuffer_or_tbuffer
@@ -477,21 +482,21 @@ cbuffer_or_tbuffer
     | TBUFFER { $$ = new_slang_node(TBUFFER); }
     ;
 
-struct_member_declaration_list
-    : struct_member_declaration { $$ = new_slang_node(STRUCT_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
-    | struct_member_declaration_list struct_member_declaration { $$ = $1; slang_node_attach_child($1, $2); }
+buffer_member_declaration_list
+    : buffer_member_declaration { $$ = new_slang_node(BUFFER_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
+    | buffer_member_declaration_list buffer_member_declaration { $$ = $1; slang_node_attach_child($1, $2); }
     ;
 
-struct_member_declaration
-    : full_struct_member_type_specifier IDENTIFIER semantic register_list ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, $4, NULL); }
-    | full_struct_member_type_specifier IDENTIFIER semantic pack_offset ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, NULL, $4); }
-    | full_struct_member_type_specifier IDENTIFIER register_list ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, $3, NULL); }
-    | full_struct_member_type_specifier IDENTIFIER pack_offset ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, NULL, $3); }
-    | full_struct_member_type_specifier IDENTIFIER semantic ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, NULL, NULL); }
-    | full_struct_member_type_specifier IDENTIFIER ';'{ $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, NULL, NULL); }
+buffer_member_declaration
+    : full_buffer_member_type_specifier IDENTIFIER semantic register_list ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, $4, NULL); }
+    | full_buffer_member_type_specifier IDENTIFIER semantic pack_offset ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, NULL, $4); }
+    | full_buffer_member_type_specifier IDENTIFIER register_list ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, $3, NULL); }
+    | full_buffer_member_type_specifier IDENTIFIER pack_offset ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, NULL, $3); }
+    | full_buffer_member_type_specifier IDENTIFIER semantic ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, NULL, NULL); }
+    | full_buffer_member_type_specifier IDENTIFIER ';'{ $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, NULL, NULL); }
     ;
 
-full_struct_member_type_specifier
+full_buffer_member_type_specifier
     : interpolation_modifier_list full_type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
     | full_type_specifier { $$ = $1; }
     ;
@@ -504,9 +509,52 @@ interpolation_modifier_list
 interpolation_modifier
     : LINEAR { $$ = new_slang_node(LINEAR); }
     | CENTROID { $$ = new_slang_node(CENTROID); }
-    | NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); }
+    // nointerpolation can be specified by full_type_specifier
+    //| NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); } 
     | NOPERSPECTIVE { $$ = new_slang_node(NOPERSPECTIVE); }
     | SAMPLE { $$ = new_slang_node(SAMPLE); }
+    ;
+
+struct_declaration
+	: full_type_specifier struct_declarator { $$ = $1; slang_node_attach_child($1, $2); }
+	| struct_declarator { $$ = $1; }
+	;
+
+struct_declarator
+    : STRUCT IDENTIFIER '{' '}' { $$ = new_slang_struct_decl(new_slang_identifier($2), NULL); }
+    | STRUCT IDENTIFIER '{' struct_member_declaration_list '}' { $$ = new_slang_struct_decl(new_slang_identifier($2), $4); }
+    | STRUCT '{' struct_member_declaration_list '}' { $$ = new_slang_struct_decl(NULL, $3); } // anonymous
+    ;
+
+struct_interpolation_modifier_list
+    : struct_interpolation_modifier { $$ = new_slang_node(STRUCT_INTERPOLATION_MODIFIER_LIST); slang_node_attach_child($$, $1); }
+    | struct_interpolation_modifier_list struct_interpolation_modifier { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+struct_interpolation_modifier
+    : interpolation_modifier { $$ = $1; }
+    | struct_member_type_order_specifier { $$ = $1; }
+    | NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); } 
+    ;
+
+struct_member_declaration_list
+    : struct_member_declaration { $$ = new_slang_node(STRUCT_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
+    | struct_member_declaration_list struct_member_declaration { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+struct_member_declaration
+    : full_struct_member_type_specifier IDENTIFIER semantic ';' { $$ = new_slang_struct_member_decl($1, new_slang_identifier($2), $3); }
+    | full_struct_member_type_specifier IDENTIFIER ';' { $$ = new_slang_struct_member_decl($1, new_slang_identifier($2), NULL); }
+    ;
+
+full_struct_member_type_specifier
+    : struct_interpolation_modifier_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
+    | type_specifier { $$ = $1; }
+    ;
+
+struct_member_type_order_specifier
+    : ROW_MAJOR { $$ = new_slang_node(ROW_MAJOR); }
+    | COLUMN_MAJOR { $$ = new_slang_node(COLUMN_MAJOR); }
     ;
 
 scalar_type_specifier
@@ -592,7 +640,7 @@ scalar_type_specifier
 
 type_specifier
     : scalar_type_specifier { $$ = $1; }
-    //| struct_or_cbuffer_specifier { $$ = $1; }
+    | struct_declarator { $$ = $1; }
     | IDENTIFIER { $$ = new_slang_identifier($1); }
     ;
 

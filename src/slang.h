@@ -35,12 +35,21 @@ typedef struct slang_node {
             struct slang_node* memberList;
         } bufferDecl;
         struct {
-            struct slang_node* typeSpecifier;
+            struct slang_node* typeSpecifiers;
             struct slang_node* identifier;
             struct slang_node* semantic;
             struct slang_node* registerList;
             struct slang_node* packOffsets;
         } bufferMemberDecl;
+        struct {
+            struct slang_node* identifier;
+            struct slang_node* memberList;
+        } structDecl;
+        struct {
+            struct slang_node* typeSpecifiers;
+            struct slang_node* identifier;
+            struct slang_node* semantic;
+        } structMemberDecl;
     };
     struct slang_node* firstChild, *parent;
     struct slang_node* siblingNext, *siblingPrev;
@@ -68,6 +77,13 @@ slang_node_t* new_slang_var_decl(
     slang_node_t* pack_offsets, 
     slang_node_t* vd_registers,
     slang_node_t* annotations);
+slang_node_t* new_slang_struct_decl(
+    slang_node_t* identifier,
+    slang_node_t* member_list);
+slang_node_t* new_slang_struct_member_decl(
+    slang_node_t* type_specifier,
+    slang_node_t* identifier,
+    slang_node_t* semantic);
 slang_node_t* new_slang_cbuffer_tbuffer_decl(
     slang_node_t* identifier,
     slang_node_t* register_node,

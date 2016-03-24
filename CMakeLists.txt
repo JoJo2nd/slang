@@ -65,7 +65,7 @@ function(BISON_GEN_SOURCE HDRS)
 
     add_custom_command(
       OUTPUT ${BISON_OUTPUT_C} ${BISON_OUTPUT_H}
-      COMMAND ${BISON_EXECUTABLE} ARGS -d -o"${BISON_OUTPUT_C}" ${FIL}
+      COMMAND ${BISON_EXECUTABLE} ARGS -vd --report=all -o"${BISON_OUTPUT_C}" ${FIL}
       DEPENDS ${FIL}
       COMMENT "Bison ${FIL} -> ${BISON_OUTPUT_H} & ${BISON_OUTPUT_C}")
   endforeach()
