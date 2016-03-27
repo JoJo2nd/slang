@@ -25,7 +25,7 @@ float4 ann_var_2 <const float min=1; float max = 1; float4 blah={0, 0, 0, 0};>;
 
 float4x4 ann_var_3 <row_major float2x2 min={0, 0, 0, 0}; string blah2 = "Some string \"literal\"";>;
 
-float3 in_normal : NORMAL; // semantics are syntactically valid here but will not appear in the input signature! (even when used in by entry point)
+float4 in_normal : NORMAL; // semantics are syntactically valid here but will not appear in the input signature! (even when used in by entry point)
 
 cbuffer const_buf_1 {
     float4 some_const_thing_1;// = float4(1,0,0,1); TODO default assignments
@@ -82,7 +82,16 @@ struct { // anonymous struct
     float4 mem4;
 } const_input_1 : register(c30); // anonymous is only when declaring 
 
-float4 main_vs(float3 in_pos : POSITION, float4 in_tc : TEXCOORD1) : SV_POSITION {
+// function prototypes
+float local_max_0();
+float local_max(float abc, float bcd);
+const float local_min(float a, float b);
+float4 main_ps() : SV_Target0;
+float4 main_vs(float3 in_pos : POSITION, float4 in_tc : TEXCOORD1) : SV_POSITION;
+
+
+float4 main_vs(float4 in_pos : POSITION, float4 in_tc : TEXCOORD1) : SV_POSITION {
+    ++in_pos;
     return float4(in_pos+in_normal, 1)
     + some_const_thing_0
     + some_const_thing_1
@@ -93,3 +102,6 @@ float4 main_ps() : SV_Target0 {
     return float4(1, 0, 0, 1);
 }
 
+float local_min(float a, float b) {
+    return a < b ? a : b;
+}

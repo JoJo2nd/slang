@@ -39,9 +39,11 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 ES                  (\\(['"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
 WS                  [ \t\v\n\f]
 whitespace          {WS}+
+L                   [a-zA-Z_]
+A                   [a-zA-Z_0-9]
 digit               [0-9]
 nondigit            [_a-zA-Z]
-identifier          {nondigit}({nondigit}|{digit})*
+identifier          {L}{A}*
 integer_constant    {digit}+
 floating_constant   {digit}+\.{digit}+
 
@@ -95,16 +97,6 @@ vs_4_0_level_9_0 return VS_4_0_LEVEL_9_0;
 vs_4_1 return VS_4_1;   
 vs_5_0 return VS_5_0;  
 
-x           return SWIZZLEMASK_X___;
-y           return SWIZZLEMASK__Y__;
-z           return SWIZZLEMASK___Z_;
-w           return SWIZZLEMASK____W;
-
-r           return SWIZZLEMASK_R___;
-g           return SWIZZLEMASK__G__;
-b           return SWIZZLEMASK___B_;
-a           return SWIZZLEMASK____A;
-
 void        return VOID;
 
 for			return FOR;
@@ -121,6 +113,7 @@ break		return BREAK;
 continue	return CONTINUE;
 discard		return DISCARD;
 
+inline      return INLINE;
 return		return RETURN;
 
 Buffer      return BUFFER;
@@ -307,11 +300,13 @@ false           { return FALSE_VALUE; }
 {floating_constant} { yylval->floatConst = atof(yytext); return FLOATCONSTANT; }
 
 \n					{ ++yyg->yylineno_r; }
+{WS}+               { /* whitespace separates tokens */ }
 .                   { /* discard bad characters */ }
 
 %%
 
 void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) 
 {
-    fprintf(stderr, "ERROR: %s:(%d:%d)", err, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
+	struct yyguts_t * yyg = (struct yyguts_t*)context->scanner;
+    fprintf(stderr, "ERROR: %s around '%s' (%d:%d)", err, yytext, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
 }

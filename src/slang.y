@@ -51,32 +51,31 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
     register_const_t regConst;
 }
 
-/*
-%type <node> translation_unit external_declaration function_definition declaration_specifiers type_qualifier type_qualifier_list
-%type <node> storage_class_specifier type_specifier assignment_operator declarator direct_declarator constant expression
-%type <node> primary_expression postfix_expression assignment_expression conditional_expression unary_expression unary_operator
-%type <node> cast_expression multiplicative_expression additive_expression shift_expression relational_expression '='ity_expression
-%type <node> and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression
-%type <node> compound_statement block_item_list block_item declaration statement initializer initializer_list declaration_list
-%type <node> identifier_list parameter_type_list type_name abstract_declarator direct_abstract_declarator init_declarator_list
-%type <node> parameter_list parameter_declaration init_declarator argument_expression_list specifier_qualifier_list 
-%type <node> expression_statement selection_statement iteration_statement jump_statement labeled_statement constant_expression
-%type <node> struct_or_cbuffer_specifier struct_or_cbuffer struct_declaration_list struct_declarator_list struct_declaration 
-%type <node> struct_declarator semantic
-*/
-
 %type <node> translation_unit
 %type <node> external_declaration declaration
 
-%type <node> variable_declaration 
-%type <node> scalar_type_specifier
+%type <node> variable_declaration variable_declarator
+%type <node> scalar_type_specifier sampler_type_specifier
 %type <node> storage_class storage_class_list type_modifier type_modifier_list type_specifier full_type_specifier
-%type <node> semantic register register_list shader_profile pack_offset single_swizzle_mask
+%type <node> semantic register register_list shader_profile pack_offset
 %type <node> annotations full_annotation_type_specifier annotation_type_specifier annotation_declaration_list annotation_declaration annotation_declaration_assignment annotation_initializer_list annotation_initializer
 %type <node> cbuffer_or_tbuffer_declaration cbuffer_or_tbuffer
 %type <node> interpolation_modifier interpolation_modifier_list 
 %type <node> full_buffer_member_type_specifier buffer_member_declaration buffer_member_declaration_list 
 %type <node> struct_declarator struct_declaration struct_interpolation_modifier_list struct_interpolation_modifier struct_member_declaration_list struct_member_declaration full_struct_member_type_specifier struct_member_type_order_specifier
+%type <node> function_definition function_declarator function_args_list function_arg
+%type <node> type_name
+%type <node> primary_expression constant expression expression_statement assignment_expression assignment_operator
+%type <node> postfix_expression
+%type <node> unary_expression unary_operator
+%type <node> cast_expression
+%type <node> argument_expression_list
+%type <node> initializer_list initializer
+%type <node> statement compound_statement 
+%type <node> block_item block_item_list 
+%type <node> conditional_expression multiplicative_expression additive_expression shift_expression relational_expression
+%type <node> equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression
+%type <node> jump_statement
 
 %token <ident> IDENTIFIER
 %token <floatConst> FLOATCONSTANT
@@ -87,16 +86,6 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token <strLiteral> STRING_LITERAL
 %token TRUE_VALUE
 %token FALSE_VALUE
-
-%token SWIZZLEMASK_X___
-%token SWIZZLEMASK__Y__
-%token SWIZZLEMASK___Z_
-%token SWIZZLEMASK____W
-
-%token SWIZZLEMASK_R___
-%token SWIZZLEMASK__G__
-%token SWIZZLEMASK___B_
-%token SWIZZLEMASK____A
 
 %token VOID
 %token FOR
@@ -110,6 +99,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token CONTINUE
 %token DISCARD
 %token SWITCH
+
+%token INLINE
 %token RETURN
 
 %token STRUCT
@@ -303,10 +294,12 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token VS_4_1
 %token VS_5_0
 
-%token TRANSLATION_UNIT
-%token FUNCTION_DEFINITION
+%token TRANSLATION_UNIT 
+%token COMPOUND_STATEMENT BLOCK_ITEM_LIST
+%token FUNCTION FUNCTION_ARG_LIST FUNCTION_ARG
 %token ANNOTATION_LIST
 %token INITIALIZER_LIST
+%token ARGUMENT_EXPRESSION_LIST
 %token BUFFER_MEMBER_DECLARATION_LIST
 
 %token VARIABLE_DECL CBUFFER_TBUFFER_DECL BUFFER_MEMBER_DECLARATION 
@@ -333,15 +326,37 @@ translation_unit
 
 external_declaration
     : declaration ';' { $$ = $1; }
+    | cbuffer_or_tbuffer_declaration ';' { $$ = $1; }
+    | function_definition { $$ = $1; }
     ;
 
 declaration
     : variable_declaration { $$ = $1; }
     | struct_declaration { $$ = $1; }
-    | cbuffer_or_tbuffer_declaration { $$ = $1; }
+    | function_declarator { $$ = $1; }
+    ;
+
+compound_statement
+    : '{' '}' { $$ = new_slang_node(COMPOUND_STATEMENT); }
+    | '{'  block_item_list '}' { $$ = new_slang_node(COMPOUND_STATEMENT); slang_node_attach_child($$, $2); }
+    ;
+
+block_item
+    : declaration ';' { $$ = $1; }
+    | statement { $$ = $1; }
+    ;
+
+block_item_list
+    : block_item { $$ = new_slang_node(BLOCK_ITEM_LIST); slang_node_attach_child($$, $1); }
+    | block_item_list block_item { $$ = $1; slang_node_attach_child($1, $2); }
     ;
 
 variable_declaration
+    : variable_declaration '=' initializer { $$ = new_slang_node('='); slang_node_attach_children($$, $1, $3, NULL); }
+    | variable_declarator { $$ = $1; }    
+    ;
+
+variable_declarator
     : full_type_specifier IDENTIFIER register_list annotations {
         $$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, $3, NULL, $4);
     }
@@ -412,19 +427,8 @@ register
     ;
 
 pack_offset
-    : ':' PACKOFFSET '(' IDENTIFIER '.' single_swizzle_mask ')' { $$ = new_slang_node(PACKOFFSET); slang_node_attach_children($$, new_slang_register_constant($4), $6, NULL); }
+    : ':' PACKOFFSET '(' IDENTIFIER '.' IDENTIFIER ')' { $$ = new_slang_node(PACKOFFSET); slang_node_attach_children($$, new_slang_register_constant($4), new_slang_identifier($6), NULL); }
     | ':' PACKOFFSET '(' IDENTIFIER ')' { $$ = new_slang_node(PACKOFFSET); slang_node_attach_child($$, new_slang_register_constant($4)); }
-    ;
-
-single_swizzle_mask
-    : SWIZZLEMASK_X___ { $$ = new_slang_node('x'); }
-    | SWIZZLEMASK__Y__ { $$ = new_slang_node('y'); }
-    | SWIZZLEMASK___Z_ { $$ = new_slang_node('z'); }
-    | SWIZZLEMASK____W { $$ = new_slang_node('w'); }
-    | SWIZZLEMASK_R___ { $$ = new_slang_node('r'); }
-    | SWIZZLEMASK__G__ { $$ = new_slang_node('g'); }
-    | SWIZZLEMASK___B_ { $$ = new_slang_node('b'); }
-    | SWIZZLEMASK____A { $$ = new_slang_node('a'); }
     ;
 
 annotations
@@ -556,6 +560,36 @@ struct_member_type_order_specifier
     : ROW_MAJOR { $$ = new_slang_node(ROW_MAJOR); }
     | COLUMN_MAJOR { $$ = new_slang_node(COLUMN_MAJOR); }
     ;
+/*
+function_type_specifier
+    : type_modifier_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
+    | type_specifier { $$ = $1; }
+    ;
+*/
+function_args_list
+    : function_arg { $$ = new_slang_node(FUNCTION_ARG_LIST); slang_node_attach_child($$, $1); }
+    | function_args_list ',' function_arg { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+function_arg
+    : full_type_specifier IDENTIFIER semantic { $$ = new_slang_function_arg($1, new_slang_identifier($2), $3); }
+    | full_type_specifier IDENTIFIER { $$ = new_slang_function_arg($1, new_slang_identifier($2), NULL); }
+    ;
+
+function_declarator /* NOTE: ignoreing clipplanes() syntax */
+    : INLINE PRECISE full_type_specifier IDENTIFIER '(' function_args_list ')' semantic { $$ = new_slang_function_declarator($3, new_slang_identifier($4), $6, $8); }
+    | INLINE PRECISE full_type_specifier IDENTIFIER '(' ')' semantic { $$ = new_slang_function_declarator($3, new_slang_identifier($4), NULL, $7); }
+    | PRECISE full_type_specifier IDENTIFIER '(' function_args_list ')' semantic { $$ = new_slang_function_declarator($2, new_slang_identifier($3), $5, $7); }
+    | PRECISE full_type_specifier IDENTIFIER '(' ')' semantic { $$ = new_slang_function_declarator($2, new_slang_identifier($3), NULL, $6); }
+    | full_type_specifier IDENTIFIER '(' function_args_list ')' semantic { $$ = new_slang_function_declarator($1, new_slang_identifier($2), $4, $6); }
+    | full_type_specifier IDENTIFIER '(' ')' semantic { $$ = new_slang_function_declarator($1, new_slang_identifier($2), NULL, $5); }
+    | full_type_specifier IDENTIFIER '(' function_args_list ')' { $$ = new_slang_function_declarator($1, new_slang_identifier($2), $4, NULL); }
+    | full_type_specifier IDENTIFIER '(' ')' { $$ = new_slang_function_declarator($1, new_slang_identifier($2), NULL, NULL); }
+    ;
+
+function_definition
+    : function_declarator compound_statement { $$ = $1; slang_node_attach_child($$, $2); };
+    ;
 
 scalar_type_specifier
     : VOID { $$ = new_slang_node(VOID); }
@@ -637,11 +671,37 @@ scalar_type_specifier
     | DOUBLE4X2 { $$ = new_slang_node(DOUBLE4X2); }
     | DOUBLE4X3 { $$ = new_slang_node(DOUBLE4X3); }
     | DOUBLE4X4 { $$ = new_slang_node(DOUBLE4X4); }
+    ;
+
+sampler_type_specifier
+    : SAMPLER { $$ = new_slang_node(SAMPLER); }
+    | SAMPLER1D { $$ = new_slang_node(SAMPLER1D); }
+    | SAMPLER2D { $$ = new_slang_node(SAMPLER2D); }
+    | SAMPLER3D { $$ = new_slang_node(SAMPLER3D); }
+    | SAMPLERCUBE { $$ = new_slang_node(SAMPLERCUBE); }
+    | SAMPLERSTATE { $$ = new_slang_node(SAMPLERSTATE); }
+    | SAMPLER_STATE { $$ = new_slang_node(SAMPLER_STATE); }
+    | TEXTURE1D { $$ = new_slang_node(TEXTURE1D); }
+    | TEXTURE1DARRAY { $$ = new_slang_node(TEXTURE1DARRAY); }
+    | TEXTURE2D { $$ = new_slang_node(TEXTURE2D); }
+    | TEXTURE2DARRAY { $$ = new_slang_node(TEXTURE2DARRAY); }
+    | TEXTURE3D { $$ = new_slang_node(TEXTURE3D); }
+    | TEXTURE3DARRAY { $$ = new_slang_node(TEXTURE3DARRAY); }
+    | TEXTURECUBE { $$ = new_slang_node(TEXTURECUBE); }
+    ;
 
 type_specifier
     : scalar_type_specifier { $$ = $1; }
+    | sampler_type_specifier { $$ = $1; }
     | struct_declarator { $$ = $1; }
     | IDENTIFIER { $$ = new_slang_identifier($1); }
+    ;
+
+type_name
+    : type_specifier type_name { $$ = $1; slang_node_attach_child($1, $2); }
+    | type_specifier { $$ = $1; }
+    | type_modifier type_name { $$ = $1; slang_node_attach_child($1, $2); }
+    | type_modifier { $$ = $1; }
     ;
 
 shader_profile
@@ -688,6 +748,175 @@ shader_profile
     | VS_4_0_LEVEL_9_0 { $$ = new_slang_node(VS_4_0_LEVEL_9_0); }
     | VS_4_1 { $$ = new_slang_node(VS_4_1); }
     | VS_5_0 { $$ = new_slang_node(VS_5_0); }
+    ;
+
+statement
+    : /*labeled_statement { $$ = $1; }
+    | */compound_statement { $$ = $1; }
+    | expression_statement { $$ = $1; }
+    /*| selection_statement { $$ = $1; }
+    | iteration_statement { $$ = $1; } */
+    | jump_statement { $$ = $1; }
+    ;
+
+expression_statement
+    : ';' { $$ = new_slang_node(NULL_NODE); }
+    | expression ';' { $$ = $1; }
+    ;
+
+primary_expression
+    : IDENTIFIER { $$ = new_slang_identifier($1); }
+    | constant { $$ = $1; }
+    | '(' expression ')' { $$ = $2; }
+    | '(' argument_expression_list ')' { $$ = $2; }
+    ;
+
+constant
+    : INTCONSTANT       { $$ = new_slang_int_constant($1); }// includes character_constant 
+    | FLOATCONSTANT     { $$ = new_slang_float_constant($1); }
+    ;
+
+expression
+    : assignment_expression { $$ = $1; }
+    | expression ',' assignment_expression { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+assignment_expression
+    : conditional_expression { $$ = $1; }
+    | unary_expression assignment_operator assignment_expression { $$ = $2; slang_node_attach_children($2, $1, $3, NULL); }
+    ;
+
+assignment_operator
+    : '=' { $$ = new_slang_node('='); }
+    | MUL_ASSIGN { $$ = new_slang_node(MUL_ASSIGN); }
+    | DIV_ASSIGN { $$ = new_slang_node(DIV_ASSIGN); }
+    | MOD_ASSIGN { $$ = new_slang_node(MOD_ASSIGN); }
+    | ADD_ASSIGN { $$ = new_slang_node(ADD_ASSIGN); }
+    | SUB_ASSIGN { $$ = new_slang_node(SUB_ASSIGN); }
+    | LEFT_ASSIGN { $$ = new_slang_node(LEFT_ASSIGN); }
+    | RIGHT_ASSIGN { $$ = new_slang_node(RIGHT_ASSIGN); }
+    | AND_ASSIGN { $$ = new_slang_node(AND_ASSIGN); }
+    | XOR_ASSIGN { $$ = new_slang_node(XOR_ASSIGN); }
+    | OR_ASSIGN { $$ = new_slang_node(OR_ASSIGN); }
+    ;
+
+unary_expression
+    : postfix_expression { $$ = $1; }
+    | INC_OP unary_expression { $$ = new_slang_node(INC_OP); slang_node_attach_child($$, $2); }
+    | DEC_OP unary_expression { $$ = new_slang_node(DEC_OP); slang_node_attach_child($$, $2); }
+    | unary_operator cast_expression { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+unary_operator
+    : '+' { $$ = new_slang_node('+'); }
+    | '-' { $$ = new_slang_node('-'); }
+    | '~' { $$ = new_slang_node('~'); }
+    | '!' { $$ = new_slang_node('!'); }
+    ;
+
+cast_expression
+    : unary_expression { $$ = $1; }
+    | '(' type_name ')' cast_expression { $$ = $2; slang_node_attach_child($2, $4); }
+    ;
+
+postfix_expression
+    : primary_expression { $$ = $1; }
+    | postfix_expression '[' expression ']' { $$ = $1; slang_node_attach_child($1, $3); }
+    | postfix_expression '(' ')' { $$ = $1; }
+    | postfix_expression '(' argument_expression_list ')' { $$ = $1; slang_node_attach_child($1, $3); }
+    | postfix_expression '.' IDENTIFIER { $$ = $1; slang_node_attach_children($1, new_slang_node('.'), new_slang_identifier($3), NULL); }
+    | postfix_expression INC_OP { $$ = $1; slang_node_attach_child($1, new_slang_node(INC_OP)); }
+    | postfix_expression DEC_OP { $$ = $1; slang_node_attach_child($1, new_slang_node(DEC_OP)); }
+    | '(' type_name ')' '{' initializer_list '}' { $$ = $2; slang_node_attach_child($2, $5); }
+    | '(' type_name ')' '{' initializer_list ',' '}' { $$ = $2; slang_node_attach_child($2, $5); }
+    | type_name '(' argument_expression_list ')' { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+
+argument_expression_list
+    : assignment_expression { $$ = new_slang_node(ARGUMENT_EXPRESSION_LIST); slang_node_attach_child($$, $1); }
+    | argument_expression_list ',' assignment_expression { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+initializer
+    : '{' initializer_list '}' { $$ = $2; }
+    | '{' initializer_list ',' '}' { $$ = $2; }
+    | assignment_expression { $$ = $1; }
+    ;
+
+initializer_list
+    : initializer { $$ = new_slang_node(INITIALIZER_LIST); slang_node_attach_child($$, $1); }
+    | initializer_list ',' initializer { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+multiplicative_expression
+    : cast_expression { $$ = $1; }
+    | multiplicative_expression '*' cast_expression { $$ = new_slang_node('*'); slang_node_attach_children($$, $1, $3, NULL); }
+    | multiplicative_expression '/' cast_expression { $$ = new_slang_node('/'); slang_node_attach_children($$, $1, $3, NULL); }
+    | multiplicative_expression '%' cast_expression { $$ = new_slang_node('%'); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+additive_expression
+    : multiplicative_expression { $$ = $1; }
+    | additive_expression '+' multiplicative_expression { $$ = new_slang_node('+'); slang_node_attach_children($$, $1, $3, NULL); }
+    | additive_expression '-' multiplicative_expression { $$ = new_slang_node('-'); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+shift_expression
+    : additive_expression { $$ = $1; }
+    | shift_expression LEFT_OP additive_expression { $$ = new_slang_node(LEFT_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    | shift_expression RIGHT_OP additive_expression { $$ = new_slang_node(RIGHT_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+relational_expression
+    : shift_expression { $$ = $1; }
+    | relational_expression '<' shift_expression { $$ = new_slang_node('<'); slang_node_attach_children($$, $1, $3, NULL); }
+    | relational_expression '>' shift_expression { $$ = new_slang_node('>'); slang_node_attach_children($$, $1, $3, NULL); }
+    | relational_expression LE_OP shift_expression { $$ = new_slang_node(LE_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    | relational_expression GE_OP shift_expression { $$ = new_slang_node(GE_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+equality_expression
+    : relational_expression { $$ = $1; }
+    | equality_expression EQ_OP relational_expression { $$ = new_slang_node(EQ_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    | equality_expression NE_OP relational_expression { $$ = new_slang_node(NE_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+and_expression
+    : equality_expression { $$ = $1; }
+    | and_expression '&' equality_expression { $$ = new_slang_node('&'); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+exclusive_or_expression
+    : and_expression { $$ = $1; }
+    | exclusive_or_expression '^' and_expression { $$ = new_slang_node('^'); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+inclusive_or_expression
+    : exclusive_or_expression { $$ = $1; }
+    | inclusive_or_expression '|' exclusive_or_expression { $$ = new_slang_node('|'); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+logical_and_expression
+    : inclusive_or_expression { $$ = $1; }
+    | logical_and_expression AND_OP inclusive_or_expression { $$ = new_slang_node(AND_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+logical_or_expression
+    : logical_and_expression { $$ = $1; }
+    | logical_or_expression OR_OP logical_and_expression { $$ = new_slang_node(OR_OP); slang_node_attach_children($$, $1, $3, NULL); }
+    ;
+
+conditional_expression
+    : logical_or_expression { $$ = $1; }
+    | logical_or_expression '?' expression ':' conditional_expression { $$ = new_slang_node(TERNARY_OPERATOR); slang_node_attach_children($$, $1, $3, $5, NULL); }
+    ;
+
+jump_statement
+    : /*CONTINUE ';' { $$ = new_slang_node(CONTINUE); }
+    | BREAK ';' { $$ = new_slang_node(BREAK); }
+    |*/ RETURN ';' { $$ = new_slang_node(RETURN); }
+    | RETURN expression ';' { $$ = new_slang_node(RETURN); slang_node_attach_child($$, $2);}
     ;
 
 /* Let's start again 

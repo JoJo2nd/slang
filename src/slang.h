@@ -50,6 +50,18 @@ typedef struct slang_node {
             struct slang_node* identifier;
             struct slang_node* semantic;
         } structMemberDecl;
+        struct {
+            struct slang_node* typeSpecifiers;
+            struct slang_node* identifier;
+            struct slang_node* args;
+            struct slang_node* semantic;
+            struct slang_node* body;
+        } functionDecl;
+        struct {
+            struct slang_node* typeSpecifiers;
+            struct slang_node* identifier;
+            struct slang_node* semantic;
+        } functionArg;
     };
     struct slang_node* firstChild, *parent;
     struct slang_node* siblingNext, *siblingPrev;
@@ -94,6 +106,15 @@ slang_node_t* new_slang_buffer_member_decl(
     slang_node_t* semantic,
     slang_node_t* register_list,
     slang_node_t* pack_offset);
+slang_node_t* new_slang_function_arg(
+    slang_node_t* type_specifier,
+    slang_node_t* identifier,
+    slang_node_t* semantic);
+slang_node_t* new_slang_function_declarator(
+    slang_node_t* type_specifier,
+    slang_node_t* identifier,
+    slang_node_t* args,
+    slang_node_t* semantic);
 void slang_node_attach_child(slang_node_t* parent, slang_node_t* child);
 void slang_node_attach_children(slang_node_t* parent, ...);
 void slang_node_make_sibling(slang_node_t* node, slang_node_t* new_sibling);
