@@ -84,6 +84,7 @@ set( LINK_DIRS
 file(GLOB SRC_FILES 
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 file(GLOB FLEX_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.l"
@@ -94,7 +95,24 @@ file(GLOB BISON_SRC_FILES
 FLEX_GEN_SOURCE(FLEX_CODE_FILES ${FLEX_SRC_FILES})
 BISON_GEN_SOURCE(BISON_CODE_FILES ${BISON_SRC_FILES})
 
+file(GLOB HLSL_BE_SRC_FILES 
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/hlsl/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/hlsl/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/hlsl/*.cpp"
+)
+
+file(GLOB GLSL_BE_SRC_FILES 
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/glsl/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/glsl/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/glsl/*.cpp"
+)
+
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+
 include_directories(${INCLUDE_DIRS})
 link_directories(${LINK_DIRS})
+
+
+add_library(slang2hlsl MODULE ${HLSL_BE_SRC_FILES})
 add_executable(slangc ${SRC_FILES} ${FLEX_SRC_FILES} ${FLEX_CODE_FILES} ${BISON_SRC_FILES} ${BISON_CODE_FILES})
+add_dependencies(slangc slang2hlsl)

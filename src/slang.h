@@ -20,6 +20,11 @@ typedef struct slang_node {
         double double_const;
         register_const_t regConst;
         struct {
+            char* ident;
+            unsigned int arraySize; // 0 for unsized, 1 non array, arraySizeChild != NULL for other cases
+            struct slang_node* arraySizeChild;
+        } declarator;
+        struct {
             struct slang_node* storageClasses;
             struct slang_node* typeModifiers;
             struct slang_node* type;
@@ -116,9 +121,12 @@ slang_node_t* new_slang_function_declarator(
     slang_node_t* args,
     slang_node_t* semantic);
 void slang_node_attach_child(slang_node_t* parent, slang_node_t* child);
+void slang_node_attach_child_front(slang_node_t* parent, slang_node_t* child);
 void slang_node_attach_children(slang_node_t* parent, ...);
 void slang_node_make_sibling(slang_node_t* node, slang_node_t* new_sibling);
 void slang_node_make_siblings(slang_node_t* node, ...);
+
+char* slang_copy_string(const char* in_str);
 
 //Here, but only temp
 void print_slang_AST(slang_node_t* ast_root, FILE* out);

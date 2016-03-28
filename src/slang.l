@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "slang.h"
+#include "sym_table.h"
 
 
 #define YY_EXTRA_TYPE slang_parse_context_t*
@@ -58,44 +59,6 @@ ps return PS;
 gs return GS;
 ds return DS;
 hs return HS;
-cs_4_0 return CS_4_0;   
-cs_4_1 return CS_4_1;   
-cs_5_0 return CS_5_0;   
-ds_5_0 return DS_5_0;   
-gs_4_0 return GS_4_0;   
-gs_4_1 return GS_4_1;   
-gs_5_0 return GS_5_0;   
-hs_5_0 return HS_5_0;   
-lib_4_0 return LIB_4_0;  
-lib_4_1 return LIB_4_1;   
-lib_4_0_level_9_1 return LIB_4_0_LEVEL_9_1;   
-lib_4_0_level_9_3 return LIB_4_0_LEVEL_9_3;   
-lib_5_0 return LIB_5_0;   
-ps_2_0 return PS_2_0;   
-ps_2_a return PS_2_A;   
-ps_2_b return PS_2_B;  
-ps_2_sw return PS_2_SW;   
-ps_3_0 return PS_3_0;   
-ps_3_sw return PS_3_SW;   
-ps_4_0 return PS_4_0;   
-ps_4_0_level_9_1 return PS_4_0_LEVEL_9_1;   
-ps_4_0_level_9_3 return PS_4_0_LEVEL_9_3;  
-ps_4_0_level_9_0 return PS_4_0_LEVEL_9_0;   
-ps_4_1 return PS_4_1;   
-ps_5_0 return PS_5_0;   
-tx_1_0 return TX_1_0;   
-vs_1_1 return VS_1_1;   
-vs_2_0 return VS_2_0;   
-vs_2_a return VS_2_A;   
-vs_2_sw return VS_2_SW;  
-vs_3_0 return VS_3_0;   
-vs_3_sw return VS_3_SW;   
-vs_4_0 return VS_4_0;   
-vs_4_0_level_9_1 return VS_4_0_LEVEL_9_1;   
-vs_4_0_level_9_3 return VS_4_0_LEVEL_9_3;   
-vs_4_0_level_9_0 return VS_4_0_LEVEL_9_0;  
-vs_4_1 return VS_4_1;   
-vs_5_0 return VS_5_0;  
 
 void        return VOID;
 
@@ -243,7 +206,7 @@ sample return SAMPLE;
 typedef return TYPEDEF;
 
 register return REGISTER;
-packoffset return PACKOFFSET;
+semantic return SEMANTIC;
 
 \<\< return LEFT_OP;
 \>\> return RIGHT_OP;
@@ -295,7 +258,7 @@ packoffset return PACKOFFSET;
 true            { return TRUE_VALUE; }
 false           { return FALSE_VALUE; }
 
-{identifier}        { yylval->ident = strdup(yytext); return IDENTIFIER; }
+{identifier}        { yylval->ident = strdup(yytext); return slang_sym_table_check(yytext); }
 {integer_constant}  { yylval->intConst = atoi(yytext); return INTCONSTANT; }
 {floating_constant} { yylval->floatConst = atof(yytext); return FLOATCONSTANT; }
 

@@ -3,4 +3,6 @@ src/*.tab.h
 src/*.tab.c
 src/*.yy.h
 src/*.yy.c
+src/*.yyy
+src/*.output
 tests/*.fco

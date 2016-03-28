@@ -11,6 +11,9 @@
 
 #include "slang.yy.h"
 
+uintptr_t loadLibrary(const char* library);
+uintptr_t findProcessAddress(uintptr_t lib, const char* proc_name);
+
 int main(int argc, char** argv) {
     static const char argopts[] = "v";
     struct option long_options[] = {
@@ -58,12 +61,22 @@ int main(int argc, char** argv) {
     fclose(context.fin);
 
     if (context.root) {
-        slang_node_t* fake_root = new_slang_node(TRANSLATION_UNIT);
-        slang_node_attach_child(fake_root, context.root);
-        FILE* f_out = fopen("out.a", "wb");
+        slang_node_t* fake_root = context.root;//new_slang_node(TRANSLATION_UNIT);
+        //slang_node_attach_child(fake_root, context.root);
+        FILE* f_out = fopen("out.ast", "wb");
         if (f_out) {
             print_slang_AST(fake_root, f_out);
             fclose(f_out);
+        }
+
+        uintptr_t hlsl_lib = loadLibrary("../../lib/Debug/slang2hlsl");
+        if (hlsl_lib) {
+            FILE* hlsl_out = fopen("out.hlsl", "wb");
+            int (*hlsl_process_slang_ast)(const slang_node_t*, FILE*) = findProcessAddress(hlsl_lib, "process_slang_ast");
+            if (hlsl_process_slang_ast) {
+                hlsl_process_slang_ast(fake_root, hlsl_out);
+            }
+            fclose(hlsl_out);
         }
     }
 }

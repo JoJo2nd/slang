@@ -54,15 +54,14 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> translation_unit
 %type <node> external_declaration declaration
 
-%type <node> variable_declaration variable_declarator
+%type <node> variable_declaration variable_declarator external_variable_declaration external_declaration_specifiers 
 %type <node> scalar_type_specifier sampler_type_specifier
-%type <node> storage_class storage_class_list type_modifier type_modifier_list type_specifier full_type_specifier
-%type <node> semantic register register_list shader_profile pack_offset
-%type <node> annotations full_annotation_type_specifier annotation_type_specifier annotation_declaration_list annotation_declaration annotation_declaration_assignment annotation_initializer_list annotation_initializer
+%type <node> type_modifier /*type_modifier_list*/ type_specifier full_type_specifier input_output_qualifier_list input_output_qualifier interpolation_modifier
+%type <node> semantic register register_list shader_profile 
+//%type <node> annotations full_annotation_type_specifier annotation_type_specifier annotation_declaration_list annotation_declaration annotation_declaration_assignment annotation_initializer_list annotation_initializer
 %type <node> cbuffer_or_tbuffer_declaration cbuffer_or_tbuffer
-%type <node> interpolation_modifier interpolation_modifier_list 
-%type <node> full_buffer_member_type_specifier buffer_member_declaration buffer_member_declaration_list 
-%type <node> struct_declarator struct_declaration struct_interpolation_modifier_list struct_interpolation_modifier struct_member_declaration_list struct_member_declaration full_struct_member_type_specifier struct_member_type_order_specifier
+%type <node> buffer_member_declaration_list 
+%type <node> struct_declarator struct_declaration struct_member_declaration_list struct_member_declaration
 %type <node> function_definition function_declarator function_args_list function_arg
 %type <node> type_name
 %type <node> primary_expression constant expression expression_statement assignment_expression assignment_operator
@@ -77,7 +76,10 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression
 %type <node> jump_statement
 
+%type <node> declarator init_declarator_list init_declarator
+
 %token <ident> IDENTIFIER
+%token <ident> TYPE_NAME
 %token <floatConst> FLOATCONSTANT
 %token <double> DOUBLECONSTANT
 %token <intConst> INTCONSTANT
@@ -255,54 +257,18 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token GS
 %token DS
 %token HS
-%token CS_4_0
-%token CS_4_1
-%token CS_5_0
-%token DS_5_0
-%token GS_4_0
-%token GS_4_1
-%token GS_5_0
-%token HS_5_0
-%token LIB_4_0
-%token LIB_4_1
-%token LIB_4_0_LEVEL_9_1
-%token LIB_4_0_LEVEL_9_3
-%token LIB_5_0
-%token PS_2_0
-%token PS_2_A
-%token PS_2_B
-%token PS_2_SW
-%token PS_3_0
-%token PS_3_SW
-%token PS_4_0
-%token PS_4_0_LEVEL_9_1
-%token PS_4_0_LEVEL_9_3
-%token PS_4_0_LEVEL_9_0
-%token PS_4_1
-%token PS_5_0
-%token TX_1_0
-%token VS_1_1
-%token VS_2_0
-%token VS_2_A
-%token VS_2_SW
-%token VS_3_0
-%token VS_3_SW
-%token VS_4_0
-%token VS_4_0_LEVEL_9_1
-%token VS_4_0_LEVEL_9_3
-%token VS_4_0_LEVEL_9_0
-%token VS_4_1
-%token VS_5_0
 
 %token TRANSLATION_UNIT 
 %token COMPOUND_STATEMENT BLOCK_ITEM_LIST
 %token FUNCTION FUNCTION_ARG_LIST FUNCTION_ARG
 %token ANNOTATION_LIST
 %token INITIALIZER_LIST
+%token INPUT_OUTPUT_QUALIFIER_LIST
 %token ARGUMENT_EXPRESSION_LIST
 %token BUFFER_MEMBER_DECLARATION_LIST
 
-%token VARIABLE_DECL CBUFFER_TBUFFER_DECL BUFFER_MEMBER_DECLARATION 
+%token INIT_DECLARATOR_LIST DECLARATOR EXTERNAL_DECLARATION_SPECIFIERS
+%token EXTERNAL_VARIABLE_DECLARATION VARIABLE_DECL CBUFFER_TBUFFER_DECL BUFFER_MEMBER_DECLARATION 
 %token STRUCT_DECL STRUCT_MEMBER_DECL
 %token STRUCT_INTERPOLATION_MODIFIER_LIST STRUCT_MEMBER_DECLARATION_LIST
 
@@ -320,12 +286,14 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %%
 
 translation_unit
-    : external_declaration { $$ = $1; context->root = $1; }
-    | translation_unit external_declaration { context->root = $1; slang_node_make_sibling($1, $2); }
+    : external_declaration { $$ = new_slang_node(TRANSLATION_UNIT); context->root = $$;  slang_node_attach_child($$, $1); }
+    | translation_unit external_declaration { slang_node_attach_child($1, $2); }
     ;
 
 external_declaration
-    : declaration ';' { $$ = $1; }
+    : external_variable_declaration { $$ = $1; }
+    | struct_declaration  ';' { $$ = $1; }
+    | function_declarator ';'  { $$ = $1; }
     | cbuffer_or_tbuffer_declaration ';' { $$ = $1; }
     | function_definition { $$ = $1; }
     ;
@@ -351,69 +319,81 @@ block_item_list
     | block_item_list block_item { $$ = $1; slang_node_attach_child($1, $2); }
     ;
 
+external_declaration_specifiers
+    : register external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | register { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    | interpolation_modifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | interpolation_modifier { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    | type_modifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_modifier { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    | type_specifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_specifier { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    ;
+
+external_variable_declaration
+    : external_declaration_specifiers ';' { $$ = new_slang_node(EXTERNAL_VARIABLE_DECLARATION); slang_node_attach_child($$, $1); }
+    | external_declaration_specifiers init_declarator_list ';'  { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
 variable_declaration
-    : variable_declaration '=' initializer { $$ = new_slang_node('='); slang_node_attach_children($$, $1, $3, NULL); }
+    : variable_declaration '=' initializer { $$ = $1; slang_node_attach_children($1, $3, NULL); }
+    //  variable_declaration assignment_expression { $$ = $1; slang_node_attach_children($$, $2, NULL); }
     | variable_declarator { $$ = $1; }    
     ;
 
 variable_declarator
-    : full_type_specifier IDENTIFIER register_list annotations {
-        $$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, $3, NULL, $4);
-    }
-    | full_type_specifier IDENTIFIER register_list {
-		$$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, $3, NULL, NULL);
-    }
-    | full_type_specifier IDENTIFIER semantic annotations{
-		$$ = new_slang_var_decl($1, new_slang_identifier($2), $3, NULL, NULL, $4);
-    }
-    | full_type_specifier IDENTIFIER semantic {
-        $$ = new_slang_var_decl($1, new_slang_identifier($2), $3, NULL, NULL, NULL);
-    }
-    | full_type_specifier IDENTIFIER annotations {
-        $$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, NULL, NULL, $3);
-    }
-    | full_type_specifier IDENTIFIER {
-        $$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, NULL, NULL, NULL);
-    }
+    : full_type_specifier IDENTIFIER { $$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, NULL, NULL, NULL); }
+    ;
+
+init_declarator_list
+    : init_declarator { $$ = new_slang_node(INIT_DECLARATOR_LIST); slang_node_attach_child($$, $1); }
+    | init_declarator_list ',' init_declarator { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+init_declarator
+    : declarator '=' initializer { $$ = new_slang_node('='); slang_node_attach_children($$, $1, $3, NULL); }
+    | declarator { $$ = $1; }
+    ;
+
+declarator
+    : IDENTIFIER { $$ = new_slang_node(DECLARATOR); $$->declarator.ident = slang_copy_string($1); $$->declarator.arraySize = 1; }
+    | '(' declarator ')' { $$ = $2; }
+    | declarator '[' ']' { $$ = $1; $1->declarator.arraySize = 0; }
+    //| declarator '[' '*' ']' { $$ = $1; }
+    //| direct_declarator '[' STATIC type_qualifier_list assignment_expression ']'
+    //| direct_declarator '[' STATIC assignment_expression ']'
+    //| direct_declarator '[' type_qualifier_list '*' ']'
+    //| direct_declarator '[' type_qualifier_list STATIC assignment_expression ']'
+    //| direct_declarator '[' type_qualifier_list assignment_expression ']'
+    //| direct_declarator '[' type_qualifier_list ']'
+    | declarator '[' assignment_expression ']' { $$ = $1; $1->declarator.arraySizeChild = $3; slang_node_attach_child($1, $3); }
+    //| direct_declarator '(' parameter_type_list ')'
+    | declarator '(' ')' { $$ = $1; }
+    //| direct_declarator '(' identifier_list ')'
     ;
 
 full_type_specifier
-    : storage_class_list type_modifier_list type_specifier { $$ = $1; slang_node_attach_children($1, $2, $3, NULL); }
-    | type_modifier_list storage_class_list type_specifier { $$ = $1; slang_node_attach_children($1, $2, $3, NULL); }
-    | storage_class_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
-    | type_modifier_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
+    : type_specifier full_type_specifier { $$ = $2; slang_node_attach_child($2, $1); }
     | type_specifier { $$ = $1; }
+    | type_modifier full_type_specifier { $$ = $2; slang_node_attach_child($2, $1); }
+    | type_modifier { $$ = $1; }
     ;
-
-storage_class_list
-    : storage_class { $$ = $1; }
-    | storage_class_list storage_class { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-storage_class
-    : EXTERN { $$ = new_slang_node(EXTERN); }
-    | NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); }
-    | PRECISE { $$ = new_slang_node(PRECISE); }
-    | SHARED { $$ = new_slang_node(SHARED); }
-    | GROUPSHARED { $$ = new_slang_node(GROUPSHARED); }
-    | STATIC { $$ = new_slang_node(STATIC); }
-    | UNIFORM { $$ = new_slang_node(UNIFORM); }
-    | VOLATILE { $$ = new_slang_node(UNIFORM); } // volatile is ignored by HLSL but we output put it anyway
-    ;
-
-type_modifier_list
+/*
+type_modifier_list // aka storage_qualifier_list
     : type_modifier { $$ = $1; }
     | type_modifier_list type_modifier { $$ = $1; slang_node_attach_child($1, $2); }
     ;
-
-type_modifier
+*/
+type_modifier // aka storage_qualifier
     : CONST { $$ = new_slang_node(CONST); }
     | ROW_MAJOR { $$ = new_slang_node(ROW_MAJOR); }
     | COLUMN_MAJOR { $$ = new_slang_node(COLUMN_MAJOR); }
+    | SHARED { $$ = new_slang_node(SHARED); } // groupshared across thread groups
+    | STATIC { $$ = new_slang_node(STATIC); } // not visible outside shader. In function, same as C/C++
     ;
 
 semantic
-    : ':' IDENTIFIER { $$ = new_slang_semantic($2); }
+    : SEMANTIC '(' IDENTIFIER ')' { $$ = new_slang_semantic($3); }
     ;
 
 register_list
@@ -422,15 +402,29 @@ register_list
     ;
 
 register
-    : ':' REGISTER '(' shader_profile ',' IDENTIFIER ')' { $$ = new_slang_node(REGISTER); slang_node_attach_children($$, $4, new_slang_register_constant($6), NULL); }
-    | ':' REGISTER '(' IDENTIFIER ')' { $$ = new_slang_node(REGISTER); slang_node_attach_children($$, new_slang_register_constant($4), NULL); }
+    : REGISTER '(' shader_profile ',' IDENTIFIER ')' { $$ = new_slang_node(REGISTER); slang_node_attach_children($$, $3, new_slang_register_constant($5), NULL); }
+    | REGISTER '(' IDENTIFIER ')' { $$ = new_slang_node(REGISTER); slang_node_attach_children($$, new_slang_register_constant($3), NULL); }
     ;
 
-pack_offset
-    : ':' PACKOFFSET '(' IDENTIFIER '.' IDENTIFIER ')' { $$ = new_slang_node(PACKOFFSET); slang_node_attach_children($$, new_slang_register_constant($4), new_slang_identifier($6), NULL); }
-    | ':' PACKOFFSET '(' IDENTIFIER ')' { $$ = new_slang_node(PACKOFFSET); slang_node_attach_child($$, new_slang_register_constant($4)); }
+interpolation_modifier
+    : LINEAR { $$ = new_slang_node(LINEAR); }
+    | CENTROID { $$ = new_slang_node(CENTROID); }
+    | NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); } 
+    | NOPERSPECTIVE { $$ = new_slang_node(NOPERSPECTIVE); }
+    | SAMPLE { $$ = new_slang_node(SAMPLE); }
     ;
 
+input_output_qualifier_list
+    : input_output_qualifier { $$ = new_slang_node(INPUT_OUTPUT_QUALIFIER_LIST); slang_node_attach_child($$, $1); }
+    | input_output_qualifier_list input_output_qualifier { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+input_output_qualifier
+    : interpolation_modifier { $$ = $1; }
+    | semantic { $$ = $1; }
+    ;
+
+/*
 annotations
     : '<' annotation_declaration_list '>' { $$ = $2; }
     ;
@@ -473,10 +467,11 @@ annotation_initializer
     : INTCONSTANT { $$ = new_slang_int_constant($1); }
     | FLOATCONSTANT { $$ = new_slang_float_constant($1); }
     ;
+*/
 
 cbuffer_or_tbuffer_declaration
-    : cbuffer_or_tbuffer IDENTIFIER register_list '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), $3, NULL); }
-    | cbuffer_or_tbuffer IDENTIFIER register_list '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), $3, $5); }
+    : register_list cbuffer_or_tbuffer IDENTIFIER '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($3), $1, NULL); }
+    | register_list cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($3), $1, $5); }
     | cbuffer_or_tbuffer IDENTIFIER '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, NULL); }
     | cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, $4); }
     ;
@@ -487,41 +482,12 @@ cbuffer_or_tbuffer
     ;
 
 buffer_member_declaration_list
-    : buffer_member_declaration { $$ = new_slang_node(BUFFER_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
-    | buffer_member_declaration_list buffer_member_declaration { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-buffer_member_declaration
-    : full_buffer_member_type_specifier IDENTIFIER semantic register_list ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, $4, NULL); }
-    | full_buffer_member_type_specifier IDENTIFIER semantic pack_offset ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, NULL, $4); }
-    | full_buffer_member_type_specifier IDENTIFIER register_list ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, $3, NULL); }
-    | full_buffer_member_type_specifier IDENTIFIER pack_offset ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, NULL, $3); }
-    | full_buffer_member_type_specifier IDENTIFIER semantic ';' { $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), $3, NULL, NULL); }
-    | full_buffer_member_type_specifier IDENTIFIER ';'{ $$ = new_slang_buffer_member_decl($1, new_slang_identifier($2), NULL, NULL, NULL); }
-    ;
-
-full_buffer_member_type_specifier
-    : interpolation_modifier_list full_type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
-    | full_type_specifier { $$ = $1; }
-    ;
-
-interpolation_modifier_list
-    : interpolation_modifier { $$ = $1; }
-    | interpolation_modifier_list interpolation_modifier { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-interpolation_modifier
-    : LINEAR { $$ = new_slang_node(LINEAR); }
-    | CENTROID { $$ = new_slang_node(CENTROID); }
-    // nointerpolation can be specified by full_type_specifier
-    //| NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); } 
-    | NOPERSPECTIVE { $$ = new_slang_node(NOPERSPECTIVE); }
-    | SAMPLE { $$ = new_slang_node(SAMPLE); }
+    : variable_declaration ';' { $$ = new_slang_node(BUFFER_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
+    | buffer_member_declaration_list variable_declaration ';' { $$ = $1; slang_node_attach_child($1, $2); }
     ;
 
 struct_declaration
-	: full_type_specifier struct_declarator { $$ = $1; slang_node_attach_child($1, $2); }
-	| struct_declarator { $$ = $1; }
+	: struct_declarator { $$ = $1; }
 	;
 
 struct_declarator
@@ -530,59 +496,29 @@ struct_declarator
     | STRUCT '{' struct_member_declaration_list '}' { $$ = new_slang_struct_decl(NULL, $3); } // anonymous
     ;
 
-struct_interpolation_modifier_list
-    : struct_interpolation_modifier { $$ = new_slang_node(STRUCT_INTERPOLATION_MODIFIER_LIST); slang_node_attach_child($$, $1); }
-    | struct_interpolation_modifier_list struct_interpolation_modifier { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-struct_interpolation_modifier
-    : interpolation_modifier { $$ = $1; }
-    | struct_member_type_order_specifier { $$ = $1; }
-    | NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); } 
+struct_member_declaration
+    : input_output_qualifier_list variable_declarator { $$ = $2; slang_node_attach_children($2, $1, NULL); }
+    | variable_declarator { $$ = $1; }    
     ;
 
 struct_member_declaration_list
-    : struct_member_declaration { $$ = new_slang_node(STRUCT_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
-    | struct_member_declaration_list struct_member_declaration { $$ = $1; slang_node_attach_child($1, $2); }
+    : struct_member_declaration ';' { $$ = new_slang_node(STRUCT_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
+    | struct_member_declaration_list struct_member_declaration ';'{ $$ = $1; slang_node_attach_child($1, $2); }
     ;
 
-struct_member_declaration
-    : full_struct_member_type_specifier IDENTIFIER semantic ';' { $$ = new_slang_struct_member_decl($1, new_slang_identifier($2), $3); }
-    | full_struct_member_type_specifier IDENTIFIER ';' { $$ = new_slang_struct_member_decl($1, new_slang_identifier($2), NULL); }
-    ;
-
-full_struct_member_type_specifier
-    : struct_interpolation_modifier_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
-    | type_specifier { $$ = $1; }
-    ;
-
-struct_member_type_order_specifier
-    : ROW_MAJOR { $$ = new_slang_node(ROW_MAJOR); }
-    | COLUMN_MAJOR { $$ = new_slang_node(COLUMN_MAJOR); }
-    ;
-/*
-function_type_specifier
-    : type_modifier_list type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
-    | type_specifier { $$ = $1; }
-    ;
-*/
 function_args_list
     : function_arg { $$ = new_slang_node(FUNCTION_ARG_LIST); slang_node_attach_child($$, $1); }
     | function_args_list ',' function_arg { $$ = $1; slang_node_attach_child($1, $3); }
     ;
 
 function_arg
-    : full_type_specifier IDENTIFIER semantic { $$ = new_slang_function_arg($1, new_slang_identifier($2), $3); }
+    : input_output_qualifier_list full_type_specifier IDENTIFIER { $$ = new_slang_function_arg($2, new_slang_identifier($3), $1); }
     | full_type_specifier IDENTIFIER { $$ = new_slang_function_arg($1, new_slang_identifier($2), NULL); }
     ;
 
-function_declarator /* NOTE: ignoreing clipplanes() syntax */
-    : INLINE PRECISE full_type_specifier IDENTIFIER '(' function_args_list ')' semantic { $$ = new_slang_function_declarator($3, new_slang_identifier($4), $6, $8); }
-    | INLINE PRECISE full_type_specifier IDENTIFIER '(' ')' semantic { $$ = new_slang_function_declarator($3, new_slang_identifier($4), NULL, $7); }
-    | PRECISE full_type_specifier IDENTIFIER '(' function_args_list ')' semantic { $$ = new_slang_function_declarator($2, new_slang_identifier($3), $5, $7); }
-    | PRECISE full_type_specifier IDENTIFIER '(' ')' semantic { $$ = new_slang_function_declarator($2, new_slang_identifier($3), NULL, $6); }
-    | full_type_specifier IDENTIFIER '(' function_args_list ')' semantic { $$ = new_slang_function_declarator($1, new_slang_identifier($2), $4, $6); }
-    | full_type_specifier IDENTIFIER '(' ')' semantic { $$ = new_slang_function_declarator($1, new_slang_identifier($2), NULL, $5); }
+function_declarator
+    : semantic full_type_specifier IDENTIFIER '(' function_args_list ')' { $$ = new_slang_function_declarator($2, new_slang_identifier($3), $5, $1); }
+    | semantic full_type_specifier IDENTIFIER '(' ')' { $$ = new_slang_function_declarator($2, new_slang_identifier($3), NULL, $1); }
     | full_type_specifier IDENTIFIER '(' function_args_list ')' { $$ = new_slang_function_declarator($1, new_slang_identifier($2), $4, NULL); }
     | full_type_specifier IDENTIFIER '(' ')' { $$ = new_slang_function_declarator($1, new_slang_identifier($2), NULL, NULL); }
     ;
@@ -694,7 +630,7 @@ type_specifier
     : scalar_type_specifier { $$ = $1; }
     | sampler_type_specifier { $$ = $1; }
     | struct_declarator { $$ = $1; }
-    | IDENTIFIER { $$ = new_slang_identifier($1); }
+    | TYPE_NAME { $$ = new_slang_identifier($1); }
     ;
 
 type_name
@@ -710,44 +646,6 @@ shader_profile
     | GS { $$ = new_slang_node(GS); }
     | DS { $$ = new_slang_node(DS); }
     | HS { $$ = new_slang_node(HS); }
-    | CS_4_0 { $$ = new_slang_node(CS_4_0); }
-    | CS_4_1 { $$ = new_slang_node(CS_4_1); }
-    | CS_5_0 { $$ = new_slang_node(CS_5_0); }
-    | DS_5_0 { $$ = new_slang_node(DS_5_0); }
-    | GS_4_0 { $$ = new_slang_node(GS_4_0); }
-    | GS_4_1 { $$ = new_slang_node(GS_4_1); }
-    | GS_5_0 { $$ = new_slang_node(GS_5_0); }
-    | HS_5_0 { $$ = new_slang_node(HS_5_0); }
-    | LIB_4_0 { $$ = new_slang_node(LIB_4_0); }
-    | LIB_4_1 { $$ = new_slang_node(LIB_4_1); }
-    | LIB_4_0_LEVEL_9_1 { $$ = new_slang_node(LIB_4_0_LEVEL_9_1); }
-    | LIB_4_0_LEVEL_9_3 { $$ = new_slang_node(LIB_4_0_LEVEL_9_3); }
-    | LIB_5_0 { $$ = new_slang_node(LIB_5_0); }
-    | PS_2_0 { $$ = new_slang_node(PS_2_0); }
-    | PS_2_A { $$ = new_slang_node(PS_2_A); }
-    | PS_2_B { $$ = new_slang_node(PS_2_B); }
-    | PS_2_SW { $$ = new_slang_node(PS_2_SW); }
-    | PS_3_0 { $$ = new_slang_node(PS_3_0); }
-    | PS_3_SW { $$ = new_slang_node(PS_3_SW); }
-    | PS_4_0 { $$ = new_slang_node(PS_4_0); }
-    | PS_4_0_LEVEL_9_1 { $$ = new_slang_node(PS_4_0_LEVEL_9_1); }
-    | PS_4_0_LEVEL_9_3 { $$ = new_slang_node(PS_4_0_LEVEL_9_3); }
-    | PS_4_0_LEVEL_9_0 { $$ = new_slang_node(PS_4_0_LEVEL_9_0); }
-    | PS_4_1 { $$ = new_slang_node(PS_4_1); }
-    | PS_5_0 { $$ = new_slang_node(PS_5_0); }
-    | TX_1_0 { $$ = new_slang_node(TX_1_0); }
-    | VS_1_1 { $$ = new_slang_node(VS_1_1); }
-    | VS_2_0 { $$ = new_slang_node(VS_2_0); }
-    | VS_2_A { $$ = new_slang_node(VS_2_A); }
-    | VS_2_SW { $$ = new_slang_node(VS_2_SW); }
-    | VS_3_0 { $$ = new_slang_node(VS_3_0); }
-    | VS_3_SW { $$ = new_slang_node(VS_3_SW); }
-    | VS_4_0 { $$ = new_slang_node(VS_4_0); }
-    | VS_4_0_LEVEL_9_1 { $$ = new_slang_node(VS_4_0_LEVEL_9_1); }
-    | VS_4_0_LEVEL_9_3 { $$ = new_slang_node(VS_4_0_LEVEL_9_3); }
-    | VS_4_0_LEVEL_9_0 { $$ = new_slang_node(VS_4_0_LEVEL_9_0); }
-    | VS_4_1 { $$ = new_slang_node(VS_4_1); }
-    | VS_5_0 { $$ = new_slang_node(VS_5_0); }
     ;
 
 statement
@@ -768,7 +666,6 @@ primary_expression
     : IDENTIFIER { $$ = new_slang_identifier($1); }
     | constant { $$ = $1; }
     | '(' expression ')' { $$ = $2; }
-    | '(' argument_expression_list ')' { $$ = $2; }
     ;
 
 constant
@@ -919,497 +816,4 @@ jump_statement
     | RETURN expression ';' { $$ = new_slang_node(RETURN); slang_node_attach_child($$, $2);}
     ;
 
-/* Let's start again 
-translation_unit
-	: external_declaration { $$ = $1; context->root = $1; }
-	| translation_unit external_declaration { context->root = $1; slang_node_attach_child($1, $2); }
-	;
-
-external_declaration
-	: function_definition { $$ = $1; }
-	| declaration { $$ = $1; }
-	;
-
-compound_statement
-	: '{' '}' { $$ = new_slang_node(NULL_NODE); }
-	| '{'  block_item_list '}' { $$ = $2; }
-	;
-
-block_item
-	: declaration { $$ = $1; }
-	| statement { $$ = $1; }
-	;
-
-block_item_list
-	: block_item { $$ = $1; }
-	| block_item_list block_item { $$ = $1; slang_node_attach_child($1, $2); }
-	;
-
-function_definition
-	: declaration_specifiers declarator declaration_list compound_statement { $$ = new_slang_node(FUNCTION_DEFINITION); slang_node_attach_children($$, $1, $2, $3, $4, NULL); }
-	| declaration_specifiers declarator compound_statement { $$ = new_slang_node(FUNCTION_DEFINITION); slang_node_attach_children($$, $1, $2, $3, NULL); }
-	;
-	
-declaration_list
-	: declaration { $$ = $1; }
-	| declaration_list declaration { $$ = $1; slang_node_attach_child($$, $2); }
-	;
-
-declaration
-	: declaration_specifiers ';' { $$ = $1; }
-	| declaration_specifiers init_declarator_list ';' { $$ = $1; slang_node_attach_child($1, $2); }
-	;
-
-declaration_specifiers
-	: storage_class_specifier declaration_specifiers { $$ = $1; slang_node_attach_child($1, $2); }
-	| storage_class_specifier { $$ = $1; }
-	| type_specifier declaration_specifiers { $$ = $1; slang_node_attach_child($1, $2); }
-	| type_specifier { $$ = $1; }
-	| type_qualifier declaration_specifiers { $$ = $1; slang_node_attach_child($1, $2); }
-	| type_qualifier { $$ = $1; }
-	;
-
-identifier_list
-	: IDENTIFIER { $$ = new_slang_identifier($1); }
-	| identifier_list ',' IDENTIFIER { $$ = $1; slang_node_attach_child($$, new_slang_identifier($3)); }
-	;
-
-parameter_type_list
-	: parameter_list { $$ = $1; }
-	;
-
-parameter_list
-	: parameter_declaration { $$ = $1; }
-	| parameter_list ',' parameter_declaration { $$ = $1; slang_node_attach_child($1, $3); }
-	;
-
-parameter_declaration
-	: declaration_specifiers declarator { $$ = $1; slang_node_attach_child($1, $2); }
-	| declaration_specifiers abstract_declarator { $$ = $1; slang_node_attach_child($1, $2); }
-	| declaration_specifiers { $$ = $1; }
-	;
-
-init_declarator_list
-	: init_declarator { $$ = $1; }
-	| init_declarator_list ',' init_declarator { $$ = $1; slang_node_attach_child($1, $3); }
-	;
-
-init_declarator
-	: declarator '=' initializer { $$ = new_slang_node('='); slang_node_attach_children($$, $1, $3, NULL); }
-	| declarator { $$ = $1; }
-	;
-
-initializer
-	: '{' initializer_list '}' { $$ = $2; }
-	| '{' initializer_list ',' '}' { $$ = $2; }
-	| assignment_expression { $$ = $1; }
-	;
-
-initializer_list
-	: initializer { $$ = $1; }
-	| initializer_list ',' initializer { $$ = $1; slang_node_attach_child($1, $3); }
-	;
-
-struct_or_cbuffer_specifier
-    : struct_or_cbuffer IDENTIFIER '{' struct_declaration_list '}' { $$ = $1; slang_node_attach_children($1, new_slang_identifier($2), $4, NULL); }
-    | struct_or_cbuffer IDENTIFIER { $$ = $1; slang_node_attach_child($1, new_slang_identifier($2)); }
-    ;
-
-semantic
-    : IDENTIFIER { $$ = new_slang_identifier($1); }
-    ;
-
-struct_or_cbuffer
-    : STRUCT { $$ = new_slang_node(STRUCT); }
-    | CBUFFER { $$ = new_slang_node(CBUFFER); }
-    ;
-
-struct_declaration_list
-    : struct_declaration { $$ = $1; }
-    | struct_declaration_list struct_declaration { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-struct_declaration
-    : storage_class_specifier type_specifier IDENTIFIER ':' semantic ';' { $$ = $1; slang_node_attach_children($1, $2, new_slang_identifier($3), $5, NULL); }
-    | type_specifier IDENTIFIER ':' semantic ';' { $$ = $1; slang_node_attach_children($1, new_slang_identifier($2), $4, NULL); }
-    | type_specifier IDENTIFIER ';' { $$ = $1; slang_node_attach_children($1, new_slang_identifier($2), NULL); }
-    ;
-// prev
-struct_declaration_list
-    : struct_declaration { $$ = $1; }
-    | struct_declaration_list struct_declaration { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-struct_declaration
-    : specifier_qualifier_list struct_declarator_list ';' { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-// End prev
-struct_declarator_list
-    : struct_declarator { $$ = $1; }
-    | struct_declarator_list ',' struct_declarator { $$ = $1; slang_node_attach_child($1, $3); }
-    ;
-
-struct_declarator
-    : ':' constant_expression { $$ = $2; }
-    | declarator ':' constant_expression { $$ = $1; slang_node_attach_child($1, $3); }
-    | declarator { $$ = $1; }
-    ;
-
-type_qualifier
-	: CONST { $$ = new_slang_node(CONST); }
-	;
-
-type_qualifier_list
-	: type_qualifier { $$ = $1; }
-	| type_qualifier_list type_qualifier { $$ = $1; slang_node_attach_child($1, $2); }
-	;
-
-storage_class_specifier
-	: TYPEDEF { $$ = new_slang_node(TYPEDEF); } // identifiers must be flagged as TYPEDEF_NAME 
-	| LINEAR_MODIFIER { $$ = new_slang_node(LINEAR_MODIFIER); }
-	| CENTROID_MODIFIER { $$ = new_slang_node(CENTROID_MODIFIER); }
-	| NOINTERPOLATION { $$ = new_slang_node(NOINTERPOLATION); }
-	| NOPERSPECTIVE_MODIFIER { $$ = new_slang_node(NOPERSPECTIVE_MODIFIER); }
-	| SAMPLE_MODIFIER { $$ = new_slang_node(SAMPLE_MODIFIER); }
-	;
-
-type_specifier
-    : VOID { $$ = new_slang_node(VOID); }
-    | BOOL { $$ = new_slang_node(BOOL); }
-    | BOOL2 { $$ = new_slang_node(BOOL2); }
-    | BOOL3 { $$ = new_slang_node(BOOL3); }
-    | BOOL4 { $$ = new_slang_node(BOOL4); }
-    | BOOL2X2 { $$ = new_slang_node(BOOL2X2); }
-    | BOOL2X3 { $$ = new_slang_node(BOOL2X3); }
-    | BOOL2X4 { $$ = new_slang_node(BOOL2X4); }
-    | BOOL3X2 { $$ = new_slang_node(BOOL3X2); }
-    | BOOL3X3 { $$ = new_slang_node(BOOL3X3); }
-    | BOOL3X4 { $$ = new_slang_node(BOOL3X4); }
-    | BOOL4X2 { $$ = new_slang_node(BOOL4X2); }
-    | BOOL4X3 { $$ = new_slang_node(BOOL4X3); }
-    | BOOL4X4 { $$ = new_slang_node(BOOL4X4); }
-    | INT { $$ = new_slang_node(INT); }
-    | INT2 { $$ = new_slang_node(INT2); }
-    | INT3 { $$ = new_slang_node(INT3); }
-    | INT4 { $$ = new_slang_node(INT4); }
-    | INT2X2 { $$ = new_slang_node(INT2X2); }
-    | INT2X3 { $$ = new_slang_node(INT2X3); }
-    | INT2X4 { $$ = new_slang_node(INT2X4); }
-    | INT3X2 { $$ = new_slang_node(INT3X2); }
-    | INT3X3 { $$ = new_slang_node(INT3X3); }
-    | INT3X4 { $$ = new_slang_node(INT3X4); }
-    | INT4X2 { $$ = new_slang_node(INT4X2); }
-    | INT4X3 { $$ = new_slang_node(INT4X3); }
-    | INT4X4 { $$ = new_slang_node(INT4X4); }
-    | UINT { $$ = new_slang_node(UINT); }
-    | UINT2 { $$ = new_slang_node(UINT2); }
-    | UINT3 { $$ = new_slang_node(UINT3); }
-    | UINT4 { $$ = new_slang_node(UINT4); }
-    | UINT2X2 { $$ = new_slang_node(UINT2X2); }
-    | UINT2X3 { $$ = new_slang_node(UINT2X3); }
-    | UINT2X4 { $$ = new_slang_node(UINT2X4); }
-    | UINT3X2 { $$ = new_slang_node(UINT3X2); }
-    | UINT3X3 { $$ = new_slang_node(UINT3X3); }
-    | UINT3X4 { $$ = new_slang_node(UINT3X4); }
-    | UINT4X2 { $$ = new_slang_node(UINT4X2); }
-    | UINT4X3 { $$ = new_slang_node(UINT4X3); }
-    | UINT4X4 { $$ = new_slang_node(UINT4X4); }
-    | FLOAT { $$ = new_slang_node(FLOAT); }
-    | FLOAT2 { $$ = new_slang_node(FLOAT2); }
-    | FLOAT3 { $$ = new_slang_node(FLOAT3); }
-    | FLOAT4 { $$ = new_slang_node(FLOAT4); }
-    | FLOAT2X2 { $$ = new_slang_node(FLOAT2X2); }
-    | FLOAT2X3 { $$ = new_slang_node(FLOAT2X3); }
-    | FLOAT2X4 { $$ = new_slang_node(FLOAT2X4); }
-    | FLOAT3X2 { $$ = new_slang_node(FLOAT3X2); }
-    | FLOAT3X3 { $$ = new_slang_node(FLOAT3X3); }
-    | FLOAT3X4 { $$ = new_slang_node(FLOAT3X4); }
-    | FLOAT4X2 { $$ = new_slang_node(FLOAT4X2); }
-    | FLOAT4X3 { $$ = new_slang_node(FLOAT4X3); }
-    | FLOAT4X4 { $$ = new_slang_node(FLOAT4X4); }
-    | HALF { $$ = new_slang_node(HALF); }
-    | HALF2 { $$ = new_slang_node(HALF2); }
-    | HALF3 { $$ = new_slang_node(HALF3); }
-    | HALF4 { $$ = new_slang_node(HALF4); }
-    | HALF2X2 { $$ = new_slang_node(HALF2X2); }
-    | HALF2X3 { $$ = new_slang_node(HALF2X3); }
-    | HALF2X4 { $$ = new_slang_node(HALF2X4); }
-    | HALF3X2 { $$ = new_slang_node(HALF3X2); }
-    | HALF3X3 { $$ = new_slang_node(HALF3X3); }
-    | HALF3X4 { $$ = new_slang_node(HALF3X4); }
-    | HALF4X2 { $$ = new_slang_node(HALF4X2); }
-    | HALF4X3 { $$ = new_slang_node(HALF4X3); }
-    | HALF4X4 { $$ = new_slang_node(HALF4X4); }
-    | DOUBLE { $$ = new_slang_node(DOUBLE); }
-    | DOUBLE2 { $$ = new_slang_node(DOUBLE2); }
-    | DOUBLE3 { $$ = new_slang_node(DOUBLE3); }
-    | DOUBLE4 { $$ = new_slang_node(DOUBLE4); }
-    | DOUBLE2X2 { $$ = new_slang_node(DOUBLE2X2); }
-    | DOUBLE2X3 { $$ = new_slang_node(DOUBLE2X3); }
-    | DOUBLE2X4 { $$ = new_slang_node(DOUBLE2X4); }
-    | DOUBLE3X2 { $$ = new_slang_node(DOUBLE3X2); }
-    | DOUBLE3X3 { $$ = new_slang_node(DOUBLE3X3); }
-    | DOUBLE3X4 { $$ = new_slang_node(DOUBLE3X4); }
-    | DOUBLE4X2 { $$ = new_slang_node(DOUBLE4X2); }
-    | DOUBLE4X3 { $$ = new_slang_node(DOUBLE4X3); }
-    | DOUBLE4X4 { $$ = new_slang_node(DOUBLE4X4); }
-    | struct_or_cbuffer_specifier { $$ = $1; }
-    | IDENTIFIER { $$ = new_slang_identifier($1); }
-    ;
-
-assignment_operator
-	: '=' { $$ = new_slang_node('='); }
-	| MUL_ASSIGN { $$ = new_slang_node(MUL_ASSIGN); }
-	| DIV_ASSIGN { $$ = new_slang_node(DIV_ASSIGN); }
-	| MOD_ASSIGN { $$ = new_slang_node(MOD_ASSIGN); }
-	| ADD_ASSIGN { $$ = new_slang_node(ADD_ASSIGN); }
-	| SUB_ASSIGN { $$ = new_slang_node(SUB_ASSIGN); }
-	| LEFT_ASSIGN { $$ = new_slang_node(LEFT_ASSIGN); }
-	| RIGHT_ASSIGN { $$ = new_slang_node(RIGHT_ASSIGN); }
-	| AND_ASSIGN { $$ = new_slang_node(AND_ASSIGN); }
-	| XOR_ASSIGN { $$ = new_slang_node(XOR_ASSIGN); }
-	| OR_ASSIGN { $$ = new_slang_node(OR_ASSIGN); }
-	;
-
-declarator
-	: direct_declarator { $$ = $1; }
-	// pointer direct_declarator // HLSL has no pointers
-	;
-
-direct_declarator
-	: IDENTIFIER { $$ = new_slang_identifier($1); }
-	| '(' declarator ')' { $$ = $2; }
-	| direct_declarator '[' ']' { $$ = $1; }
-	| direct_declarator '[' STATIC type_qualifier_list assignment_expression ']' { $$ = $1; slang_node_attach_children($1, $4, $5, NULL); }
-	| direct_declarator '[' STATIC assignment_expression ']' { $$ = $1; slang_node_attach_child($1, $4); }
-	| direct_declarator '[' type_qualifier_list STATIC assignment_expression ']' { $$ = $1; slang_node_attach_children($1, $3, $5, NULL); }
-	| direct_declarator '[' type_qualifier_list assignment_expression ']' { $$ = $1; slang_node_attach_children($1, $3, $4, NULL); }
-	| direct_declarator '[' type_qualifier_list ']' { $$ = $1; slang_node_attach_child($1, $3); }
-	| direct_declarator '[' assignment_expression ']' { $$ = $1; slang_node_attach_child($1, $3); }
-	| direct_declarator '(' parameter_type_list ')' { $$ = $1; slang_node_attach_child($1, $3); }
-	| direct_declarator '(' ')' { $$ = $1; }
-	| direct_declarator '(' identifier_list ')' { $$ = $1; slang_node_attach_child($1, $3); }
-	// | direct_declarator '[' type_qualifier_list '*' ']'
-	// | direct_declarator '[' '*' ']' // 
-	;
-
-constant
-	: INTCONSTANT		{ $$ = new_slang_int_constant($1); }// includes character_constant 
-	| FLOATCONSTANT		{ $$ = new_slang_float_constant($1); }
-	//| ENUMERATION_CONSTANT	// Are ENUMS valid in HLSL?
-	;
-
-//string // HLSL doesn't do string literials (not in a normal way)
-//	: STRING_LITERAL { $$ = new_slang_node() }
-//	;
-
-
-expression
-	: assignment_expression { $$ = $1; }
-	| expression ',' assignment_expression { $$ = $1; slang_node_attach_child($1, $3); }
-	;
-
-primary_expression
-	: IDENTIFIER { $$ = new_slang_identifier($1); }
-	| constant { $$ = $1; }
-	| '(' expression ')' { $$ = $2; }
-	;
-
-argument_expression_list
-	: assignment_expression { $$ = $1; }
-	| argument_expression_list ',' assignment_expression { $$ = $1; slang_node_attach_child($1, $3); }
-	;
-
-postfix_expression
-	: primary_expression { $$ = $1; }
-	| postfix_expression '[' expression ']' { $$ = $1; slang_node_attach_child($1, $3); }
-	| postfix_expression '(' ')' { $$ = $1; }
-	| postfix_expression '(' argument_expression_list ')' { $$ = $1; slang_node_attach_child($1, $3); }
-	| postfix_expression '.' IDENTIFIER { $$ = $1; slang_node_attach_children($1, new_slang_node('.'), new_slang_identifier($3), NULL); }
-	| postfix_expression INC_OP { $$ = $1; slang_node_attach_child($1, new_slang_node(INC_OP)); }
-	| postfix_expression DEC_OP { $$ = $1; slang_node_attach_child($1, new_slang_node(DEC_OP)); }
-	| '(' type_name ')' '{' initializer_list '}' { $$ = $2; slang_node_attach_child($2, $5); }
-	| '(' type_name ')' '{' initializer_list ',' '}' { $$ = $2; slang_node_attach_child($2, $5); }
-	;
-
-assignment_expression
-	: conditional_expression { $$ = $1; }
-	| unary_expression assignment_operator assignment_expression { $$ = $1; slang_node_attach_children($1, $2, $3, NULL); }
-	;
-
-conditional_expression
-	: logical_or_expression { $$ = $1; }
-	| logical_or_expression '?' expression ':' conditional_expression { $$ = new_slang_node(TERNARY_OPERATOR); slang_node_attach_children($1, $3, $5, NULL); }
-	;
-
-unary_expression
-	: postfix_expression { $$ = $1; }
-	| INC_OP unary_expression { $$ = new_slang_node(INC_OP); slang_node_attach_child($$, $2); }
-	| DEC_OP unary_expression { $$ = new_slang_node(DEC_OP); slang_node_attach_child($$, $2); }
-	| unary_operator cast_expression { $$ = $1; slang_node_attach_child($1, $2); }
-	//| SIZEOF unary_expression
-	//| SIZEOF '(' type_name ')'
-	//| ALIGNOF '(' type_name ')'
-	;
-
-unary_operator
-	: '&' { $$ = new_slang_node('&'); }
-	| '*' { $$ = new_slang_node('*'); }
-	| '+' { $$ = new_slang_node('+'); }
-	| '-' { $$ = new_slang_node('-'); }
-	| '~' { $$ = new_slang_node('~'); }
-	| '!' { $$ = new_slang_node('!'); }
-	;
-
-cast_expression
-	: unary_expression { $$ = $1; }
-	| '(' type_name ')' cast_expression { $$ = $2; slang_node_attach_child($2, $4); }
-	;
-
-multiplicative_expression
-	: cast_expression { $$ = $1; }
-	| multiplicative_expression '*' cast_expression { $$ = new_slang_node('*'); slang_node_attach_children($$, $1, $3, NULL); }
-	| multiplicative_expression '/' cast_expression { $$ = new_slang_node('/'); slang_node_attach_children($$, $1, $3, NULL); }
-	| multiplicative_expression '%' cast_expression { $$ = new_slang_node('%'); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-additive_expression
-	: multiplicative_expression { $$ = $1; }
-	| additive_expression '+' multiplicative_expression { $$ = new_slang_node('+'); slang_node_attach_children($$, $1, $3, NULL); }
-	| additive_expression '-' multiplicative_expression { $$ = new_slang_node('-'); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-shift_expression
-	: additive_expression { $$ = $1; }
-	| shift_expression LEFT_OP additive_expression { $$ = new_slang_node(LEFT_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	| shift_expression RIGHT_OP additive_expression { $$ = new_slang_node(RIGHT_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-relational_expression
-	: shift_expression { $$ = $1; }
-	| relational_expression '<' shift_expression { $$ = new_slang_node('<'); slang_node_attach_children($$, $1, $3, NULL); }
-	| relational_expression '>' shift_expression { $$ = new_slang_node('>'); slang_node_attach_children($$, $1, $3, NULL); }
-	| relational_expression LE_OP shift_expression { $$ = new_slang_node(LE_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	| relational_expression GE_OP shift_expression { $$ = new_slang_node(GE_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-'='ity_expression
-	: relational_expression { $$ = $1; }
-	| '='ity_expression EQ_OP relational_expression { $$ = new_slang_node(EQ_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	| '='ity_expression NE_OP relational_expression { $$ = new_slang_node(NE_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-and_expression
-	: '='ity_expression { $$ = $1; }
-	| and_expression '&' '='ity_expression { $$ = new_slang_node('&'); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-exclusive_or_expression
-	: and_expression { $$ = $1; }
-	| exclusive_or_expression CARET and_expression { $$ = new_slang_node(CARET); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-inclusive_or_expression
-	: exclusive_or_expression { $$ = $1; }
-	| inclusive_or_expression '|' exclusive_or_expression { $$ = new_slang_node('|'); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-logical_and_expression
-	: inclusive_or_expression { $$ = $1; }
-	| logical_and_expression AND_OP inclusive_or_expression { $$ = new_slang_node(AND_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-logical_or_expression
-	: logical_and_expression { $$ = $1; }
-	| logical_or_expression OR_OP logical_and_expression { $$ = new_slang_node(OR_OP); slang_node_attach_children($$, $1, $3, NULL); }
-	;
-
-type_name
-	: specifier_qualifier_list abstract_declarator { $$ = $1; slang_node_attach_child($1, $2); }
-	| specifier_qualifier_list { $$ = $1; }
-	;
-
-specifier_qualifier_list
-	: type_specifier specifier_qualifier_list { $$ = $1; slang_node_attach_child($1, $2); }
-	| type_specifier { $$ = $1; }
-	| type_qualifier specifier_qualifier_list { $$ = $1; slang_node_attach_child($1, $2); }
-	| type_qualifier { $$ = $1; }
-	;
-
-abstract_declarator
-	: direct_abstract_declarator { $$ = $1; }
-	//| pointer direct_abstract_declarator
-	//| pointer
-	;
-
-direct_abstract_declarator
-	: '(' abstract_declarator ')' { $$ = $2; }
-	| '[' ']' { $$ = new_slang_node(NULL_NODE); }
-	//| '[' '*' ']'
-	| '[' STATIC type_qualifier_list assignment_expression ']' { $$ = new_slang_node(STATIC); slang_node_attach_children($$, $3, $4, NULL); }
-	| '[' STATIC assignment_expression ']' { $$ = new_slang_node(STATIC); slang_node_attach_children($$, $3, NULL); }
-	| '[' type_qualifier_list STATIC assignment_expression ']' { $$ = $2; slang_node_attach_children($$, new_slang_node(STATIC), $4, NULL); }
-	| '[' type_qualifier_list assignment_expression ']' { $$ = $2; slang_node_attach_child($$, $3); }
-	| '[' type_qualifier_list ']' { $$ = $2; }
-	| '[' assignment_expression ']' { $$ = $2; }
-	| direct_abstract_declarator '[' ']' { $$ = $1; }
-	//| direct_abstract_declarator '[' '*' ']'
-	| direct_abstract_declarator '[' STATIC type_qualifier_list assignment_expression ']' { $$ = $1; slang_node_attach_children($$, new_slang_node(STATIC), $4, $5, NULL); }
-	| direct_abstract_declarator '[' STATIC assignment_expression ']' { $$ = $1; slang_node_attach_children($$, new_slang_node(STATIC), $4, NULL); }
-	| direct_abstract_declarator '[' type_qualifier_list assignment_expression ']' { $$ = $1; slang_node_attach_children($$, $3, $4, NULL); }
-	| direct_abstract_declarator '[' type_qualifier_list STATIC assignment_expression ']' { $$ = $1; slang_node_attach_children($$, $3, new_slang_node(STATIC), $5, NULL); }
-	| direct_abstract_declarator '[' type_qualifier_list ']' { $$ = $1; slang_node_attach_child($$, $3); }
-	| direct_abstract_declarator '[' assignment_expression ']' { $$ = $1; slang_node_attach_child($$, $3); }
-	| '(' ')' { $$ = new_slang_node(NULL_NODE); }
-	| '(' parameter_type_list ')' { $$ = $2; }
-	| direct_abstract_declarator '(' ')' { $$ = $1; }
-	| direct_abstract_declarator '(' parameter_type_list ')' { $$ = $1; slang_node_attach_child($$, $3); }
-	;
-
-statement
-	: labeled_statement { $$ = $1; }
-	| compound_statement { $$ = $1; }
-	| expression_statement { $$ = $1; }
-	| selection_statement { $$ = $1; }
-	| iteration_statement { $$ = $1; }
-	| jump_statement { $$ = $1; }
-	;
-
-labeled_statement
-	: IDENTIFIER ':' statement { $$ = new_slang_identifier($1); slang_node_attach_child($$, $3); }
-	| CASE constant_expression ':' statement { $$ = $2; slang_node_attach_child($$, $4); }
-	| DEFAULT ':' statement { $$ = new_slang_node(DEFAULT); slang_node_attach_child($$, $3); }
-	;
-
-expression_statement
-	: ';' { $$ = new_slang_node(NULL_NODE); }
-	| expression ';' { $$ = $1; }
-	;
-
-selection_statement
-	: IF '(' expression ')' statement ELSE statement { $$ = new_slang_node(IF); slang_node_attach_children($$, $3, $5, $7, NULL); }
-	| IF '(' expression ')' statement { $$ = new_slang_node(IF); slang_node_attach_children($$, $3, $5, NULL); }
-	| SWITCH '(' expression ')' statement { $$ = new_slang_node(SWITCH); slang_node_attach_children($$, $3, $5, NULL); }
-	;
-
-iteration_statement
-	: WHILE '(' expression ')' statement { $$ = new_slang_node(WHILE); slang_node_attach_children($$, $3, $5, NULL); }
-	| DO statement WHILE '(' expression ')' ';' { $$ = new_slang_node(DO); slang_node_attach_children($$, $2, $5, NULL); }
-	| FOR '(' expression_statement expression_statement ')' statement { $$ = new_slang_node(FOR); slang_node_attach_children($$, $3, $4, new_slang_node(NULL_NODE), $6, NULL); }
-	| FOR '(' expression_statement expression_statement expression ')' statement { $$ = new_slang_node(FOR); slang_node_attach_children($$, $3, $4, $5, $7, NULL); }
-	| FOR '(' declaration expression_statement ')' statement { $$ = new_slang_node(FOR); slang_node_attach_children($$, $3, $4, new_slang_node(NULL_NODE), $6, NULL); }
-	| FOR '(' declaration expression_statement expression ')' statement { $$ = new_slang_node(FOR); slang_node_attach_children($$, $3, $4, $5, $7, NULL); }
-	;
-
-jump_statement
-	: CONTINUE ';' { $$ = new_slang_node(CONTINUE); }
-	| BREAK ';' { $$ = new_slang_node(BREAK); }
-	| RETURN ';' { $$ = new_slang_node(RETURN); }
-	| RETURN expression ';' { $$ = new_slang_node(RETURN); slang_node_attach_child($$, $2);}
-	;
-
-constant_expression
-	: conditional_expression	{ $$ = $1; }// with constraints
-	;
-*/
 %%
