@@ -1,4 +1,7 @@
-
+/*
+ * Copyright 2016 James Moran. All rights reserved.
+ * License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
+ */
 #include <windows.h>
 
 //

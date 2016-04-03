@@ -1,3 +1,7 @@
+/*
+ * Copyright 2016 James Moran. All rights reserved.
+ * License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
+ */
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -40,6 +44,11 @@ int main(int argc, char** argv) {
     slang_parse_context_t context = {0};
 
     slang_lex_init(&context.scanner);
+
+    if (verbose == 1) {
+        slang_set_debug(1, context.scanner);
+    }
+
     // For any remaining command line arguments (not options). 
     while (optind < argc) {
         context.fin = fopen(argv[optind], "rb");
@@ -63,7 +72,7 @@ int main(int argc, char** argv) {
     if (context.root) {
         slang_node_t* fake_root = context.root;//new_slang_node(TRANSLATION_UNIT);
         //slang_node_attach_child(fake_root, context.root);
-        FILE* f_out = fopen("out.ast", "wb");
+        FILE* f_out = fopen("ast.dot", "wb");
         if (f_out) {
             print_slang_AST(fake_root, f_out);
             fclose(f_out);

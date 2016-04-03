@@ -1,5 +1,7 @@
 %{
 /*
+ * Copyright 2016 James Moran. All rights reserved.
+ * License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
 
 In 1985, Jeff Lee published his Yacc grammar based on a draft version of the ANSI C standard, along with a supporting Lex specification. Tom Stockfisch reposted those files to net.sources in 1987; as mentioned in the answer to '?' 17.25 of the comp.lang.c FAQ, they used to be available from ftp.uu.net as usenet/net.sources/ansi.c.grammar.Z.
 
@@ -14,7 +16,7 @@ jutta@pobox.com, 2012
 
 Last edit: 2012-12-18 DAGwyn@aol.com
 
-The grammer here is largely based on Jeff Lee's grammer. Credit where credit due.
+The grammar here is largely based on Jeff Lee's grammar. Credit where credit due.
 
 */
 #include <stdlib.h>
@@ -32,6 +34,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %}
 
 %defines
+// debugging aid
+//%define parse.trace 
 // prefix generated functions
 %define api.prefix slang_
 // make the parser re-entrant
@@ -41,6 +45,7 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %locations
 // easier debugging (...sometimes)
 //%no-lines
+%error-verbose
 
 %union {
 	struct slang_node* node;
@@ -53,16 +58,14 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 
 %type <node> translation_unit
 %type <node> external_declaration declaration
-
-%type <node> variable_declaration variable_declarator external_variable_declaration external_declaration_specifiers 
+%type <node> external_variable_declaration external_declaration_specifiers 
+%type <node> variable_declaration declaration_specifiers 
 %type <node> scalar_type_specifier sampler_type_specifier
-%type <node> type_modifier /*type_modifier_list*/ type_specifier full_type_specifier input_output_qualifier_list input_output_qualifier interpolation_modifier
-%type <node> semantic register register_list shader_profile 
+%type <node> type_modifier /*type_modifier_list*/ type_specifier input_output_qualifier interpolation_modifier
+%type <node> semantic register shader_profile 
 //%type <node> annotations full_annotation_type_specifier annotation_type_specifier annotation_declaration_list annotation_declaration annotation_declaration_assignment annotation_initializer_list annotation_initializer
-%type <node> cbuffer_or_tbuffer_declaration cbuffer_or_tbuffer
-%type <node> buffer_member_declaration_list 
-%type <node> struct_declarator struct_declaration struct_member_declaration_list struct_member_declaration
-%type <node> function_definition function_declarator function_args_list function_arg
+%type <node> struct_declaration cbuffer_or_tbuffer_specifiers cbuffer_or_tbuffer_declaration cbuffer_or_tbuffer
+//%type <node> function_definition function_declarator function_args_list function_arg
 %type <node> type_name
 %type <node> primary_expression constant expression expression_statement assignment_expression assignment_operator
 %type <node> postfix_expression
@@ -75,7 +78,9 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> conditional_expression multiplicative_expression additive_expression shift_expression relational_expression
 %type <node> equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression
 %type <node> jump_statement
-
+%type <node> struct_member_declaration_list struct_member_declaration struct_specifier_qualifier_list struct_declarator_list struct_declarator
+%type <node> buffer_member_declaration_list buffer_member_declaration buffer_specifier_qualifier_list buffer_declarator_list 
+%type <node> function_args_list function_arg function_definition
 %type <node> declarator init_declarator_list init_declarator
 
 %token <ident> IDENTIFIER
@@ -265,12 +270,13 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token INITIALIZER_LIST
 %token INPUT_OUTPUT_QUALIFIER_LIST
 %token ARGUMENT_EXPRESSION_LIST
-%token BUFFER_MEMBER_DECLARATION_LIST
 
-%token INIT_DECLARATOR_LIST DECLARATOR EXTERNAL_DECLARATION_SPECIFIERS
-%token EXTERNAL_VARIABLE_DECLARATION VARIABLE_DECL CBUFFER_TBUFFER_DECL BUFFER_MEMBER_DECLARATION 
+%token INIT_DECLARATOR_LIST DECLARATOR EXTERNAL_DECLARATION_SPECIFIERS DECLARATION_SPECIFIERS
+%token EXTERNAL_VARIABLE_DECLARATION VARIABLE_DECL 
+%token CBUFFER_TBUFFER_DECL CBUFFER_OR_TBUFFER_SPECIFIERS BUFFER_MEMBER_DECLARATION 
 %token STRUCT_DECL STRUCT_MEMBER_DECL
-%token STRUCT_INTERPOLATION_MODIFIER_LIST STRUCT_MEMBER_DECLARATION_LIST
+%token BUFFER_MEMBER_DECLARATION_LIST BUFFER_SPECIFIER_QUALIFIER_LIST BUFFER_DECLARATOR_LIST
+%token STRUCT_MEMBER_DECLARATION_LIST STRUCT_SPECIFIER_QUALIFIER_LIST STRUCT_DECLARATOR_LIST
 
 %token TYPE_SPECIFIER
 %token STATEMENT_BLOCK
@@ -292,16 +298,12 @@ translation_unit
 
 external_declaration
     : external_variable_declaration { $$ = $1; }
-    | struct_declaration  ';' { $$ = $1; }
-    | function_declarator ';'  { $$ = $1; }
-    | cbuffer_or_tbuffer_declaration ';' { $$ = $1; }
+    | cbuffer_or_tbuffer_declaration { $$ = $1; }
     | function_definition { $$ = $1; }
     ;
 
 declaration
     : variable_declaration { $$ = $1; }
-    | struct_declaration { $$ = $1; }
-    | function_declarator { $$ = $1; }
     ;
 
 compound_statement
@@ -310,7 +312,7 @@ compound_statement
     ;
 
 block_item
-    : declaration ';' { $$ = $1; }
+    : declaration { $$ = $1; }
     | statement { $$ = $1; }
     ;
 
@@ -320,29 +322,33 @@ block_item_list
     ;
 
 external_declaration_specifiers
-    : register external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
-    | register { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
-    | interpolation_modifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    : interpolation_modifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
     | interpolation_modifier { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
     | type_modifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
     | type_modifier { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
     | type_specifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
     | type_specifier { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    | register external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | register { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    | semantic external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | semantic { $$ = new_slang_node(EXTERNAL_DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    ;
+
+declaration_specifiers
+    : type_modifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_modifier { $$ = new_slang_node(DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
+    | type_specifier external_declaration_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_specifier { $$ = new_slang_node(DECLARATION_SPECIFIERS); slang_node_attach_child_front($$, $1); }
     ;
 
 external_variable_declaration
-    : external_declaration_specifiers ';' { $$ = new_slang_node(EXTERNAL_VARIABLE_DECLARATION); slang_node_attach_child($$, $1); }
+    : external_declaration_specifiers ';' { $$ = $1; }
     | external_declaration_specifiers init_declarator_list ';'  { $$ = $1; slang_node_attach_child($1, $2); }
     ;
 
 variable_declaration
-    : variable_declaration '=' initializer { $$ = $1; slang_node_attach_children($1, $3, NULL); }
-    //  variable_declaration assignment_expression { $$ = $1; slang_node_attach_children($$, $2, NULL); }
-    | variable_declarator { $$ = $1; }    
-    ;
-
-variable_declarator
-    : full_type_specifier IDENTIFIER { $$ = new_slang_var_decl($1, new_slang_identifier($2), NULL, NULL, NULL, NULL); }
+    : declaration_specifiers ';' { $$ = $1; }
+    | declaration_specifiers init_declarator_list ';'  { $$ = $1; slang_node_attach_child($1, $2); } 
     ;
 
 init_declarator_list
@@ -357,33 +363,12 @@ init_declarator
 
 declarator
     : IDENTIFIER { $$ = new_slang_node(DECLARATOR); $$->declarator.ident = slang_copy_string($1); $$->declarator.arraySize = 1; }
-    | '(' declarator ')' { $$ = $2; }
     | declarator '[' ']' { $$ = $1; $1->declarator.arraySize = 0; }
-    //| declarator '[' '*' ']' { $$ = $1; }
-    //| direct_declarator '[' STATIC type_qualifier_list assignment_expression ']'
-    //| direct_declarator '[' STATIC assignment_expression ']'
-    //| direct_declarator '[' type_qualifier_list '*' ']'
-    //| direct_declarator '[' type_qualifier_list STATIC assignment_expression ']'
-    //| direct_declarator '[' type_qualifier_list assignment_expression ']'
-    //| direct_declarator '[' type_qualifier_list ']'
     | declarator '[' assignment_expression ']' { $$ = $1; $1->declarator.arraySizeChild = $3; slang_node_attach_child($1, $3); }
-    //| direct_declarator '(' parameter_type_list ')'
-    | declarator '(' ')' { $$ = $1; }
-    //| direct_declarator '(' identifier_list ')'
+    | declarator '(' function_args_list ')' { $$ = $1; $1->declarator.function_prototype = true; slang_node_attach_child($1, $3); }
+    | declarator '(' ')' { $$ = $1; $1->declarator.function_prototype = true; }
     ;
 
-full_type_specifier
-    : type_specifier full_type_specifier { $$ = $2; slang_node_attach_child($2, $1); }
-    | type_specifier { $$ = $1; }
-    | type_modifier full_type_specifier { $$ = $2; slang_node_attach_child($2, $1); }
-    | type_modifier { $$ = $1; }
-    ;
-/*
-type_modifier_list // aka storage_qualifier_list
-    : type_modifier { $$ = $1; }
-    | type_modifier_list type_modifier { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-*/
 type_modifier // aka storage_qualifier
     : CONST { $$ = new_slang_node(CONST); }
     | ROW_MAJOR { $$ = new_slang_node(ROW_MAJOR); }
@@ -396,14 +381,11 @@ semantic
     : SEMANTIC '(' IDENTIFIER ')' { $$ = new_slang_semantic($3); }
     ;
 
-register_list
-    : register { $$ = $1; }
-    | register_list register { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
 register
-    : REGISTER '(' shader_profile ',' IDENTIFIER ')' { $$ = new_slang_node(REGISTER); slang_node_attach_children($$, $3, new_slang_register_constant($5), NULL); }
-    | REGISTER '(' IDENTIFIER ')' { $$ = new_slang_node(REGISTER); slang_node_attach_children($$, new_slang_register_constant($3), NULL); }
+    : REGISTER '(' shader_profile ',' INTCONSTANT ',' INTCONSTANT ')' { $$ = new_slang_register_constant($3, $5, $7); }
+    | REGISTER '(' shader_profile ',' INTCONSTANT ')' { $$ = new_slang_register_constant($3, $5, 0); }
+    | REGISTER '(' INTCONSTANT ',' INTCONSTANT ')' { $$ = new_slang_register_constant(NULL, $3, $5); }
+    | REGISTER '(' INTCONSTANT ')' { $$ = new_slang_register_constant(NULL, $3, 0); }
     ;
 
 interpolation_modifier
@@ -414,66 +396,21 @@ interpolation_modifier
     | SAMPLE { $$ = new_slang_node(SAMPLE); }
     ;
 
-input_output_qualifier_list
-    : input_output_qualifier { $$ = new_slang_node(INPUT_OUTPUT_QUALIFIER_LIST); slang_node_attach_child($$, $1); }
-    | input_output_qualifier_list input_output_qualifier { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
 input_output_qualifier
     : interpolation_modifier { $$ = $1; }
     | semantic { $$ = $1; }
     ;
 
-/*
-annotations
-    : '<' annotation_declaration_list '>' { $$ = $2; }
+cbuffer_or_tbuffer_specifiers
+    : register cbuffer_or_tbuffer_specifiers { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | register { $$ = new_slang_node(CBUFFER_OR_TBUFFER_SPECIFIERS); slang_node_attach_child_front($$, $1); }
     ;
-
-annotation_declaration_list
-    : annotation_declaration { $$ = new_slang_node(ANNOTATION_LIST); slang_node_attach_child($$, $1); }
-    | annotation_declaration_list annotation_declaration { $$ = $1; slang_node_attach_child($1, $2); }
-    ;
-
-annotation_declaration
-    : full_annotation_type_specifier IDENTIFIER '=' annotation_declaration_assignment ';' { 
-        $$ = new_slang_node('='); 
-        slang_node_attach_children($$, new_slang_var_decl($1, new_slang_identifier($2), NULL, NULL, NULL, NULL), $4, NULL);
-    }
-    ;
-
-full_annotation_type_specifier
-    : type_modifier_list annotation_type_specifier { $$ = $1; slang_node_attach_child($1, $2); }
-    | annotation_type_specifier { $$ = $1; }
-    ;
-
-annotation_type_specifier
-    : STRING { $$ = new_slang_node(STRING); }
-    | scalar_type_specifier { $$ = $1; }
-    ; 
-
-annotation_declaration_assignment
-    : scalar_type_specifier '(' annotation_initializer_list ')' { $$ = $1; slang_node_attach_child($1, $3); }
-    | '{' annotation_initializer_list '}' { $$ = $2; }
-    | annotation_initializer { $$ = $1; }
-    | STRING_LITERAL { $$ = new_slang_string_literal($1); }
-    ;
-
-annotation_initializer_list
-    : annotation_initializer { $$ = new_slang_node(INITIALIZER_LIST); slang_node_attach_child($$, $1); }
-    | annotation_initializer_list ',' annotation_initializer { $$ = $1; slang_node_attach_child($1, $3); }
-    ;
-
-annotation_initializer
-    : INTCONSTANT { $$ = new_slang_int_constant($1); }
-    | FLOATCONSTANT { $$ = new_slang_float_constant($1); }
-    ;
-*/
 
 cbuffer_or_tbuffer_declaration
-    : register_list cbuffer_or_tbuffer IDENTIFIER '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($3), $1, NULL); }
-    | register_list cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($3), $1, $5); }
-    | cbuffer_or_tbuffer IDENTIFIER '{' '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, NULL); }
-    | cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, $4); }
+    : cbuffer_or_tbuffer_specifiers cbuffer_or_tbuffer IDENTIFIER '{' '}' ';' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($3), NULL, NULL); slang_node_attach_child($$, $1); }
+    | cbuffer_or_tbuffer IDENTIFIER '{' '}' ';' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, NULL); }
+    | cbuffer_or_tbuffer_specifiers cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' ';' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($3), NULL, $5); slang_node_attach_child($$, $1); }
+    | cbuffer_or_tbuffer IDENTIFIER '{' buffer_member_declaration_list '}' ';' { $$ = new_slang_cbuffer_tbuffer_decl(new_slang_identifier($2), NULL, $4); }
     ;
 
 cbuffer_or_tbuffer
@@ -481,29 +418,62 @@ cbuffer_or_tbuffer
     | TBUFFER { $$ = new_slang_node(TBUFFER); }
     ;
 
+buffer_member_declaration
+    : buffer_specifier_qualifier_list { $$ = $1; }
+    | buffer_specifier_qualifier_list buffer_declarator_list { $$ = $1; slang_node_attach_children($1, $2, NULL); }    
+    ;
+
 buffer_member_declaration_list
-    : variable_declaration ';' { $$ = new_slang_node(BUFFER_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
-    | buffer_member_declaration_list variable_declaration ';' { $$ = $1; slang_node_attach_child($1, $2); }
+    : buffer_member_declaration ';' { $$ = new_slang_node(BUFFER_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
+    | buffer_member_declaration_list buffer_member_declaration ';' { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+buffer_specifier_qualifier_list
+    : interpolation_modifier buffer_specifier_qualifier_list { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | interpolation_modifier { $$ = new_slang_node(BUFFER_SPECIFIER_QUALIFIER_LIST); slang_node_attach_child_front($$, $1); }
+    | type_specifier buffer_specifier_qualifier_list { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_specifier { $$ = new_slang_node(BUFFER_SPECIFIER_QUALIFIER_LIST); slang_node_attach_child_front($$, $1); }
+    | type_modifier buffer_specifier_qualifier_list { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_modifier { $$ = new_slang_node(BUFFER_SPECIFIER_QUALIFIER_LIST); slang_node_attach_child_front($$, $1); }
+    ;
+
+buffer_declarator_list
+    : init_declarator { $$ = new_slang_node(BUFFER_DECLARATOR_LIST); slang_node_attach_child($$, $1); }
+    | buffer_declarator_list ',' init_declarator { $$ = $1; slang_node_attach_child($1, $3); }
     ;
 
 struct_declaration
-	: struct_declarator { $$ = $1; }
-	;
-
-struct_declarator
     : STRUCT IDENTIFIER '{' '}' { $$ = new_slang_struct_decl(new_slang_identifier($2), NULL); }
     | STRUCT IDENTIFIER '{' struct_member_declaration_list '}' { $$ = new_slang_struct_decl(new_slang_identifier($2), $4); }
     | STRUCT '{' struct_member_declaration_list '}' { $$ = new_slang_struct_decl(NULL, $3); } // anonymous
     ;
 
 struct_member_declaration
-    : input_output_qualifier_list variable_declarator { $$ = $2; slang_node_attach_children($2, $1, NULL); }
-    | variable_declarator { $$ = $1; }    
+    : struct_specifier_qualifier_list { $$ = $1; }
+    | struct_specifier_qualifier_list struct_declarator_list { $$ = $1; slang_node_attach_children($1, $2, NULL); }    
     ;
 
 struct_member_declaration_list
     : struct_member_declaration ';' { $$ = new_slang_node(STRUCT_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
-    | struct_member_declaration_list struct_member_declaration ';'{ $$ = $1; slang_node_attach_child($1, $2); }
+    | struct_member_declaration_list struct_member_declaration ';' { $$ = $1; slang_node_attach_child($1, $2); }
+    ;
+
+struct_specifier_qualifier_list
+    : input_output_qualifier struct_specifier_qualifier_list { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | input_output_qualifier { $$ = new_slang_node(STRUCT_SPECIFIER_QUALIFIER_LIST); slang_node_attach_child_front($$, $1); }
+    | type_specifier struct_specifier_qualifier_list { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_specifier { $$ = new_slang_node(STRUCT_SPECIFIER_QUALIFIER_LIST); slang_node_attach_child_front($$, $1); }
+    | type_modifier struct_specifier_qualifier_list { $$ = $2; slang_node_attach_child_front($2, $1); }
+    | type_modifier { $$ = new_slang_node(STRUCT_SPECIFIER_QUALIFIER_LIST); slang_node_attach_child_front($$, $1); }
+    ;
+
+struct_declarator_list
+    : struct_declarator { $$ = new_slang_node(STRUCT_DECLARATOR_LIST); slang_node_attach_child($$, $1); }
+    | struct_declarator_list ',' struct_declarator { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+struct_declarator
+    : declarator { $$ = $1; }
     ;
 
 function_args_list
@@ -512,19 +482,12 @@ function_args_list
     ;
 
 function_arg
-    : input_output_qualifier_list full_type_specifier IDENTIFIER { $$ = new_slang_function_arg($2, new_slang_identifier($3), $1); }
-    | full_type_specifier IDENTIFIER { $$ = new_slang_function_arg($1, new_slang_identifier($2), NULL); }
-    ;
-
-function_declarator
-    : semantic full_type_specifier IDENTIFIER '(' function_args_list ')' { $$ = new_slang_function_declarator($2, new_slang_identifier($3), $5, $1); }
-    | semantic full_type_specifier IDENTIFIER '(' ')' { $$ = new_slang_function_declarator($2, new_slang_identifier($3), NULL, $1); }
-    | full_type_specifier IDENTIFIER '(' function_args_list ')' { $$ = new_slang_function_declarator($1, new_slang_identifier($2), $4, NULL); }
-    | full_type_specifier IDENTIFIER '(' ')' { $$ = new_slang_function_declarator($1, new_slang_identifier($2), NULL, NULL); }
+    : external_declaration_specifiers declarator { $$ = $1; slang_node_attach_child($1, $2); }
+    | external_declaration_specifiers { $$ = $1; }
     ;
 
 function_definition
-    : function_declarator compound_statement { $$ = $1; slang_node_attach_child($$, $2); };
+    : external_declaration_specifiers declarator compound_statement { $$ = $1; slang_node_attach_children($$, $2, $3, NULL); };
     ;
 
 scalar_type_specifier
@@ -629,7 +592,7 @@ sampler_type_specifier
 type_specifier
     : scalar_type_specifier { $$ = $1; }
     | sampler_type_specifier { $$ = $1; }
-    | struct_declarator { $$ = $1; }
+    | struct_declaration { $$ = $1; }
     | TYPE_NAME { $$ = new_slang_identifier($1); }
     ;
 

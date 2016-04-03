@@ -1,3 +1,7 @@
+/*
+ * Copyright 2016 James Moran. All rights reserved.
+ * License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
+ */
 #pragma once
 
 #include <stdio.h>
@@ -6,8 +10,9 @@
 #define slang_assert(x) if (!(x)) slang_trap;
 
 typedef struct register_const {
-    int int_const;
-    char reg_type;
+    int reg_index;
+    int reg_offset;
+    struct slang_node* profileNode; 
 } register_const_t;
 
 typedef struct slang_node {
@@ -23,6 +28,7 @@ typedef struct slang_node {
             char* ident;
             unsigned int arraySize; // 0 for unsized, 1 non array, arraySizeChild != NULL for other cases
             struct slang_node* arraySizeChild;
+            int function_prototype;
         } declarator;
         struct {
             struct slang_node* storageClasses;
@@ -86,7 +92,7 @@ slang_node_t* new_slang_semantic(const char* ident);
 slang_node_t* new_slang_int_constant(int int_str);
 slang_node_t* new_slang_float_constant(float float_str);
 slang_node_t* new_slang_string_literal(const char* ident);
-slang_node_t* new_slang_register_constant(const char* reg_c);
+slang_node_t* new_slang_register_constant(slang_node_t* profile, int reg_index, int reg_offset);
 slang_node_t* new_slang_var_decl( 
     slang_node_t* type, 
     slang_node_t* ident, 

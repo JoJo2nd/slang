@@ -1,3 +1,8 @@
+#
+# Copyright 2016 James Moran. All rights reserved.
+# License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
+#
+
 cmake_minimum_required(VERSION 2.8.12.2)
 
 project(lang)
@@ -114,5 +119,6 @@ link_directories(${LINK_DIRS})
 
 
 add_library(slang2hlsl MODULE ${HLSL_BE_SRC_FILES})
+add_library(slang2glsl MODULE ${GLSL_BE_SRC_FILES})
 add_executable(slangc ${SRC_FILES} ${FLEX_SRC_FILES} ${FLEX_CODE_FILES} ${BISON_SRC_FILES} ${BISON_CODE_FILES})
 add_dependencies(slangc slang2hlsl)

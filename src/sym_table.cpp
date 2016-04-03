@@ -1,5 +1,5 @@
 
-// Temp code until I write something
+// Temp code until I write something better
 
 #include "sym_table.h"
 #include "slang.h"

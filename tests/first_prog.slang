@@ -1,14 +1,13 @@
-//shared const float4 global_var_2 : register(c2);
-//error X3000: syntax error: unexpected integer constant
-//                                 : register(3);
-//  error X3091: packoffset is only allowed in a constant buffer
-//                                 : packoffset(c0.x);
+/*
+ * Copyright 2016 James Moran. All rights reserved.
+ * License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
+ */
 
 float ann_var_0 = 1, var_0, var_1;
 
 const float var2_0 = 32, var2_1 = 64;
 
-register(c4)
+register(4)
 const float var3_0;
 
 static
@@ -31,11 +30,11 @@ float4 ann_var_6[] = {
     float4(0, 0, 0,1), 
 };
 
-register(vs, c0) register(ps, c1)
+register(vs, 0) register(ps, 1)
 cbuffer const_buf_1 {
-    float4 some_const_thing_1;// = float4(1,0,0,1); TODO default assignments
-    float4x4 some_const_thing_2;
-    float4 some_const_thing_0; // semantics are syntactically valid on cbuffers is seems but will not appear in the input signature!
+    noperspective float4 some_const_thing_1 = float4(1,0,0,1); // TODO default assignments
+    row_major float4x4 some_const_thing_2;
+    float4 some_const_thing_0, some_const_thing_3;
 };
 
 // following is valid.
@@ -55,7 +54,7 @@ struct VSInput {
 
 
 // following is valid. Note swap of const<->uniform
-register(c30)
+register(30)
 struct { // anonymous struct
     float4 mem1;
     float4 mem2;
@@ -69,11 +68,14 @@ float local_max(float abc, float bcd);
 const float local_min(float a, float b);
 
 semantic(SV_POSITION)
+float4 main_vs(semantic(POSITION) float4 in_pos, semantic(TEXCOORD1) float4 in_tc);
+
+semantic(SV_POSITION)
 float4 main_vs(semantic(POSITION) float4 in_pos, semantic(TEXCOORD1) float4 in_tc) {
-    float4 wp;
-    wp = float4(in_pos, 1);
+    float4 worldPos;
+    worldPos = float4(in_pos, 1);
     ++in_pos;
-    return wp * 
+    return worldPos * 
     (some_const_thing_0
     + some_const_thing_1
     + in_tc);
