@@ -25,7 +25,7 @@ int slang_get_column  (yyscan_t yyscanner );
 int slang_lex(SLANG_STYPE* lvalp, SLANG_LTYPE* llocp, void* scanner);
 void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err);
 
-void skip_comment();
+void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context);
 
 #ifdef _MSC_VER
 #   pragma warning( disable : 4996 )
@@ -57,7 +57,7 @@ floating_constant   {digit}+\.{digit}+
 %%
 
 "//".*                                    { /* consume //-comment TODO: /* style comments... */ }
-"/*"					  { skip_comment(); }
+"/*"									  { skip_comment(yyscanner, yyextra); }
 
 (\"([^"\\\n]|{ES})*\"{WS}*)+   { yylval->strLiteral = strdup(yytext); return STRING_LITERAL; }
 
@@ -275,21 +275,21 @@ false           { return FALSE_VALUE; }
 
 %%
 
-void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) 
-{
+void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) {
 	struct yyguts_t * yyg = (struct yyguts_t*)context->scanner;
     fprintf(stderr, "ERROR: %s around '%s' (%d:%d)", err, yytext, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
 }
 
-void skip_comment(void) {
+void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context) {
+	struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
     int c;
-    while ((c = input()) != 0) {
+    while ((c = input(yyscanner)) != 0) {
         if (c == '*') {
-            while ((c = input()) == '*');
+            while ((c = input(yyscanner)) == '*');
 
             if (c == '/') return;
         }
         if (c == 0) break;
     }
-    yyerror("EOF in comment");
+    slang_error(yylloc, context, "EOF in comment");
 }
