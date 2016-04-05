@@ -2,7 +2,9 @@
  * Copyright 2016 James Moran. All rights reserved.
  * License: https://github.com/JoJo2nd/slang/blob/master/LICENSE
  */
-
+/*
+ * All code in this shader should compile even if the program is utter rubbish.
+ */
 float ann_var_0 = 1, var_0, var_1;
 
 const float var2_0 = 32, var2_1 = 64;
@@ -37,7 +39,6 @@ cbuffer const_buf_1 {
     float4 some_const_thing_0, some_const_thing_3;
 };
 
-// following is valid.
 shared const
 struct TestStruct {
     row_major float4x4 mem11;
@@ -45,15 +46,12 @@ struct TestStruct {
     float4 mem13;
 } const_input_0;
 
-// uniform <- not valid syntax
 struct VSInput {
     semantic(POSITION) float3 position;
     semantic(TEXCOORD0) float4 colour;
     semantic(TEXCOORD1) float2 uv;
 };
 
-
-// following is valid. Note swap of const<->uniform
 register(30)
 struct { // anonymous struct
     float4 mem1;
@@ -66,10 +64,10 @@ struct { // anonymous struct
 float local_max_0();
 float local_max(float abc, float bcd);
 const float local_min(float a, float b);
-
 semantic(SV_POSITION)
 float4 main_vs(semantic(POSITION) float4 in_pos, semantic(TEXCOORD1) float4 in_tc);
 
+// function bodies
 semantic(SV_POSITION)
 float4 main_vs(semantic(POSITION) float4 in_pos, semantic(TEXCOORD1) float4 in_tc) {
     float4 worldPos;
