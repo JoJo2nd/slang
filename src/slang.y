@@ -284,6 +284,8 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 // typedef name and enumeration must be defined (but are they valid in HLSL?)
 %token TYPEDEF_NAME ENUMERATION_CONSTANT
 %token TERNARY_OPERATOR
+%token EXPRESSION_STATEMENT
+%token EXTERNAL_VARIABLE_DECLARATION VARIABLE_DECLARATION
 
 %token NULL_NODE
 
@@ -342,13 +344,13 @@ declaration_specifiers
     ;
 
 external_variable_declaration
-    : external_declaration_specifiers ';' { $$ = $1; }
-    | external_declaration_specifiers init_declarator_list ';'  { $$ = $1; slang_node_attach_child($1, $2); }
+    : external_declaration_specifiers ';' { $$ = new_slang_node(EXTERNAL_VARIABLE_DECLARATION); slang_node_attach_child($$, $1); }
+    | external_declaration_specifiers init_declarator_list ';'  { $$ = new_slang_node(EXTERNAL_VARIABLE_DECLARATION); slang_node_attach_child($$, $1); slang_node_attach_child($$, $2); }
     ;
 
 variable_declaration
-    : declaration_specifiers ';' { $$ = $1; }
-    | declaration_specifiers init_declarator_list ';'  { $$ = $1; slang_node_attach_child($1, $2); } 
+    : declaration_specifiers ';' { $$ = new_slang_node(VARIABLE_DECLARATION); slang_node_attach_child($$, $1); }
+    | declaration_specifiers init_declarator_list ';'  { $$ = new_slang_node(VARIABLE_DECLARATION); slang_node_attach_children($$, $1, $2, NULL); } 
     ;
 
 init_declarator_list
@@ -366,7 +368,7 @@ declarator
     | declarator '[' ']' { $$ = $1; $1->declarator.arraySize = 0; }
     | declarator '[' assignment_expression ']' { $$ = $1; $1->declarator.arraySizeChild = $3; slang_node_attach_child($1, $3); }
     | declarator '(' function_args_list ')' { $$ = $1; $1->declarator.function_prototype = true; slang_node_attach_child($1, $3); }
-    | declarator '(' ')' { $$ = $1; $1->declarator.function_prototype = true; }
+    | declarator '(' ')' { $$ = $1; $1->declarator.function_prototype = true; slang_node_attach_child($1, new_slang_node(FUNCTION_ARG_LIST));}
     ;
 
 type_modifier // aka storage_qualifier
@@ -621,8 +623,8 @@ statement
     ;
 
 expression_statement
-    : ';' { $$ = new_slang_node(NULL_NODE); }
-    | expression ';' { $$ = $1; }
+    : ';' { $$ = new_slang_node(EXPRESSION_STATEMENT); }
+    | expression ';' { $$ = new_slang_node(EXPRESSION_STATEMENT); slang_node_attach_child($$, $1); }
     ;
 
 primary_expression
