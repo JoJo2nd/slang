@@ -10,7 +10,7 @@ float ann_var_0 = 1, var_0, var_1;
 const float var2_0 = 32, var2_1 = 64;
 
 register(4)
-const float var3_0;
+const int var3_0;
 
 static
 float4 ann_var_1 = { 1, 2, 3, 4 };
@@ -60,6 +60,10 @@ struct { // anonymous struct
     float4 mem4;
 } const_input_1;
 
+//
+sampler someSampler;
+texture2D someTexture;
+
 // function prototypes
 float local_max_0();
 float local_max(float abc, float bcd);
@@ -72,7 +76,18 @@ semantic(SV_POSITION)
 float4 main_vs(semantic(POSITION) float4 in_pos, semantic(TEXCOORD1) float4 in_tc) {
     float4 worldPos;
     worldPos = float4(in_pos, 1);
-    ++in_pos;
+    for (int i = 0; i < 4; ++i) {
+        in_pos++;
+    }
+    int j = 0;
+    do {
+        --in_pos;
+        ++j;
+    } while(j < 2);
+    while(j<4) {
+        --in_pos;
+        ++j;
+    }
     return worldPos * 
     (some_const_thing_0
     + some_const_thing_1
@@ -81,7 +96,26 @@ float4 main_vs(semantic(POSITION) float4 in_pos, semantic(TEXCOORD1) float4 in_t
 
 semantic(SV_Target0)
 float4 main_ps() {
-    return float4(1, 0, 0, 1);
+    float red;
+    if (var_0 > 1) red = 1;
+    else {
+        red = 0.5;
+    }
+    float green;
+    switch(var3_0) {
+    case 0: {
+        green = 0.1;
+    } break;
+    case 1: {
+        float x = 0.4;
+        green = x;
+    } break;
+    case 2:
+        green = 0.7;
+        break;
+    default: green = 1;
+    }
+    return var_1 > 0 ? float4(red, green, 0, 1) : float4(red, green, 1, 1);
 }
 
 float local_min(float a, float b) {

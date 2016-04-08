@@ -47,6 +47,9 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 //%no-lines
 %error-verbose
 
+// there is one shift/reduce warning, which is correctly handled, in the if statement
+%expect 1
+
 %union {
 	struct slang_node* node;
 	char* ident;
@@ -77,11 +80,14 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %type <node> block_item block_item_list 
 %type <node> conditional_expression multiplicative_expression additive_expression shift_expression relational_expression
 %type <node> equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression
-%type <node> jump_statement
+%type <node> jump_statement iteration_statement
 %type <node> struct_member_declaration_list struct_member_declaration struct_specifier_qualifier_list struct_declarator_list struct_declarator
 %type <node> buffer_member_declaration_list buffer_member_declaration buffer_specifier_qualifier_list buffer_declarator_list 
 %type <node> function_args_list function_arg function_definition
 %type <node> declarator init_declarator_list init_declarator
+%type <node> labeled_statement constant_expression
+%type <node> selection_statement
+%type <node> for_init_statement
 
 %token <ident> IDENTIFIER
 %token <ident> TYPE_NAME
@@ -285,7 +291,7 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token TYPEDEF_NAME ENUMERATION_CONSTANT
 %token TERNARY_OPERATOR
 %token EXPRESSION_STATEMENT
-%token EXTERNAL_VARIABLE_DECLARATION VARIABLE_DECLARATION
+%token VARIABLE_DECLARATION
 
 %token NULL_NODE
 
@@ -614,12 +620,26 @@ shader_profile
     ;
 
 statement
-    : /*labeled_statement { $$ = $1; }
-    | */compound_statement { $$ = $1; }
+    : labeled_statement { $$ = $1; }
+    | compound_statement { $$ = $1; }
     | expression_statement { $$ = $1; }
-    /*| selection_statement { $$ = $1; }
-    | iteration_statement { $$ = $1; } */
+    | selection_statement { $$ = $1; }
+    | iteration_statement { $$ = $1; } 
     | jump_statement { $$ = $1; }
+    ;
+
+labeled_statement
+    : CASE constant_expression ':' statement { $$ = new_slang_node(CASE); slang_node_attach_children($$, $2, $4, NULL); }
+    | DEFAULT ':' statement { $$ = new_slang_node(DEFAULT); slang_node_attach_child($$, $3); }
+    ;
+
+selection_statement
+    : IF '(' expression ')' statement ELSE statement { 
+        slang_node_t* else_node = new_slang_node(ELSE); slang_node_attach_child(else_node, $7);
+        $$ = new_slang_node(IF); slang_node_attach_children($$, $3, $5, else_node, NULL); 
+    }
+    | IF '(' expression ')' statement { $$ = new_slang_node(IF); slang_node_attach_children($$, $3, $5, NULL); }
+    | SWITCH '(' expression ')' statement { $$ = new_slang_node(SWITCH); slang_node_attach_children($$, $3, $5, NULL); }
     ;
 
 expression_statement
@@ -641,6 +661,10 @@ constant
 expression
     : assignment_expression { $$ = $1; }
     | expression ',' assignment_expression { $$ = $1; slang_node_attach_child($1, $3); }
+    ;
+
+constant_expression
+    : conditional_expression  { $$ = $1; }/* with constraints */
     ;
 
 assignment_expression
@@ -774,11 +798,24 @@ conditional_expression
     | logical_or_expression '?' expression ':' conditional_expression { $$ = new_slang_node(TERNARY_OPERATOR); slang_node_attach_children($$, $1, $3, $5, NULL); }
     ;
 
+for_init_statement
+    : expression_statement { $$ = $1; }
+    | declaration { $$ = $1; }
+    ;
+
+iteration_statement
+    : WHILE '(' expression ')' statement { $$ = new_slang_while_node($3, $5); }
+    | DO statement WHILE '(' expression ')' ';' { $$ = new_slang_do_while_node($5, $2); }
+    | FOR '(' for_init_statement expression_statement ')' statement { $$ = new_slang_for_loop_node($3, $4, NULL, $6); }
+    | FOR '(' for_init_statement expression_statement expression ')' statement { $$ = new_slang_for_loop_node($3, $4, $5, $7); }
+    ;
+
 jump_statement
-    : /*CONTINUE ';' { $$ = new_slang_node(CONTINUE); }
+    : CONTINUE ';' { $$ = new_slang_node(CONTINUE); }
     | BREAK ';' { $$ = new_slang_node(BREAK); }
-    |*/ RETURN ';' { $$ = new_slang_node(RETURN); }
+    | RETURN ';' { $$ = new_slang_node(RETURN); }
     | RETURN expression ';' { $$ = new_slang_node(RETURN); slang_node_attach_child($$, $2);}
+    | DISCARD ';' { $$ = new_slang_node(DISCARD); }
     ;
 
 %%

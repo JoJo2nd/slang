@@ -73,6 +73,16 @@ typedef struct slang_node {
             struct slang_node* identifier;
             struct slang_node* semantic;
         } functionArg;
+        struct {
+            struct slang_node* expression;
+            struct slang_node* statements;
+        } whileLoop;
+        struct {
+            struct slang_node* start;
+            struct slang_node* loop_check; 
+            struct slang_node* iter;
+            struct slang_node* statements;
+        } forLoop;
     };
     struct slang_node* firstChild, *parent;
     struct slang_node* siblingNext, *siblingPrev;
@@ -126,6 +136,17 @@ slang_node_t* new_slang_function_declarator(
     slang_node_t* identifier,
     slang_node_t* args,
     slang_node_t* semantic);
+slang_node_t* new_slang_while_node(
+    slang_node_t* expression,
+    slang_node_t* statements);
+slang_node_t* new_slang_do_while_node(
+    slang_node_t* expression,
+    slang_node_t* statements);
+slang_node_t* new_slang_for_loop_node(
+    slang_node_t* start,
+    slang_node_t* loop_check, 
+    slang_node_t* iter,
+    slang_node_t* statements);
 void slang_node_attach_child(slang_node_t* parent, slang_node_t* child);
 void slang_node_attach_child_front(slang_node_t* parent, slang_node_t* child);
 void slang_node_attach_children(slang_node_t* parent, ...);

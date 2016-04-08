@@ -275,6 +275,47 @@ slang_node_t* new_slang_function_declarator(
     return fn;
 }
 
+slang_node_t* new_slang_while_node(
+    slang_node_t* expression,
+    slang_node_t* statements) {
+    slang_node_t* wn = init_slang_node(malloc(sizeof(slang_node_t)));
+    wn->tokentype = WHILE;
+    wn->whileLoop.expression = expression;
+    wn->whileLoop.statements = statements;
+    slang_node_attach_children(wn, expression, statements, NULL);
+    return wn;
+}
+
+slang_node_t* new_slang_do_while_node(
+    slang_node_t* expression,
+    slang_node_t* statements) {
+    slang_node_t* wn = init_slang_node(malloc(sizeof(slang_node_t)));
+    wn->tokentype = DO;
+    wn->whileLoop.expression = expression;
+    wn->whileLoop.statements = statements;
+    slang_node_attach_children(wn, expression, statements, NULL);
+    return wn;
+}
+
+slang_node_t* new_slang_for_loop_node(
+    slang_node_t* start,
+    slang_node_t* loop_check, 
+    slang_node_t* iter,
+    slang_node_t* statements) {
+    slang_node_t* fln = init_slang_node(malloc(sizeof(slang_node_t)));
+    fln->tokentype = FOR;
+    fln->forLoop.start = start;
+    fln->forLoop.loop_check = loop_check;
+    fln->forLoop.iter = iter;
+    fln->forLoop.statements = statements;
+    slang_node_attach_children(fln, start, loop_check, NULL);
+    if (iter) {
+        slang_node_attach_child(fln, iter);
+    }
+    slang_node_attach_child(fln, statements);
+    return fln;
+}
+
 void slang_node_attach_children(slang_node_t* parent, ...) {
     slang_node_t* temp;
     int child_i = 0;
