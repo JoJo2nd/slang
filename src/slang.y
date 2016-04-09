@@ -292,6 +292,7 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token TERNARY_OPERATOR
 %token EXPRESSION_STATEMENT
 %token VARIABLE_DECLARATION
+%token PARENTHESIZE
 
 %token NULL_NODE
 
@@ -629,17 +630,42 @@ statement
     ;
 
 labeled_statement
-    : CASE constant_expression ':' statement { $$ = new_slang_node(CASE); slang_node_attach_children($$, $2, $4, NULL); }
-    | DEFAULT ':' statement { $$ = new_slang_node(DEFAULT); slang_node_attach_child($$, $3); }
+    : CASE constant_expression ':' statement {
+        $$ = new_slang_node(CASE); 
+        $$->caseNode.constant = $2;
+        $$->caseNode.statements = $4;
+        slang_node_attach_children($$, $2, $4, NULL);
+    }
+    | DEFAULT ':' statement {
+        $$ = new_slang_node(DEFAULT);
+        $$->defaultCaseNode.statements = $3;
+        slang_node_attach_child($$, $3);
+    }
     ;
 
 selection_statement
     : IF '(' expression ')' statement ELSE statement { 
-        slang_node_t* else_node = new_slang_node(ELSE); slang_node_attach_child(else_node, $7);
-        $$ = new_slang_node(IF); slang_node_attach_children($$, $3, $5, else_node, NULL); 
+        slang_node_t* else_node = new_slang_node(ELSE); 
+        else_node->elseNode.statements = $7;
+        slang_node_attach_child(else_node, $7);
+        $$ = new_slang_node(IF); 
+        $$->ifNode.test = $3;
+        $$->ifNode.statements = $5;
+        $$->ifNode.elseClause = else_node;
+        slang_node_attach_children($$, $3, $5, else_node, NULL); 
     }
-    | IF '(' expression ')' statement { $$ = new_slang_node(IF); slang_node_attach_children($$, $3, $5, NULL); }
-    | SWITCH '(' expression ')' statement { $$ = new_slang_node(SWITCH); slang_node_attach_children($$, $3, $5, NULL); }
+    | IF '(' expression ')' statement {
+        $$ = new_slang_node(IF);
+        $$->ifNode.test = $3;
+        $$->ifNode.statements = $5;
+        slang_node_attach_children($$, $3, $5, NULL);
+    }
+    | SWITCH '(' expression ')' statement {
+        $$ = new_slang_node(SWITCH);
+        $$->switchNode.test = $3;
+        $$->switchNode.statements = $5;
+        slang_node_attach_children($$, $3, $5, NULL);
+    }
     ;
 
 expression_statement
@@ -650,7 +676,10 @@ expression_statement
 primary_expression
     : IDENTIFIER { $$ = new_slang_identifier($1); }
     | constant { $$ = $1; }
-    | '(' expression ')' { $$ = $2; }
+    | '(' expression ')' { 
+        $$ = new_slang_node(PARENTHESIZE);
+        slang_node_attach_child($$, $2);
+    }
     ;
 
 constant
@@ -795,7 +824,13 @@ logical_or_expression
 
 conditional_expression
     : logical_or_expression { $$ = $1; }
-    | logical_or_expression '?' expression ':' conditional_expression { $$ = new_slang_node(TERNARY_OPERATOR); slang_node_attach_children($$, $1, $3, $5, NULL); }
+    | logical_or_expression '?' expression ':' conditional_expression {
+        $$ = new_slang_node(TERNARY_OPERATOR);
+        $$->ternaryOperator.test = $1;
+        $$->ternaryOperator.trueClause = $3;
+        $$->ternaryOperator.falseClause = $5;
+        slang_node_attach_children($$, $1, $3, $5, NULL);
+    }
     ;
 
 for_init_statement

@@ -83,6 +83,30 @@ typedef struct slang_node {
             struct slang_node* iter;
             struct slang_node* statements;
         } forLoop;
+        struct {
+            struct slang_node* test;
+            struct slang_node* statements;
+            struct slang_node* elseClause;
+        } ifNode;
+        struct {
+            struct slang_node* statements;
+        } elseNode;
+        struct {
+            struct slang_node* test;
+            struct slang_node* statements;
+        } switchNode;
+        struct {
+            struct slang_node* constant;
+            struct slang_node* statements;
+        } caseNode;
+        struct {
+            struct slang_node* statements;
+        } defaultCaseNode;
+        struct {
+            struct slang_node* test;
+            struct slang_node* trueClause;
+            struct slang_node* falseClause;
+        } ternaryOperator;
     };
     struct slang_node* firstChild, *parent;
     struct slang_node* siblingNext, *siblingPrev;

@@ -6,26 +6,63 @@
 #include "../../slang.tab.h"
 #include <unordered_set>
 #include <vector>
+#include <stack>
 #include <functional>
 
 #define slang2hlsl_trap __debugbreak()
 #define slang2hlsl_assert(x) if (!(x)) slang2hlsl_trap;
 #define slang2hlsl_validate(ctx, x, msg, ...) if (!(x)) { fprintf(stderr, msg, __VA_ARGS__); slang2hlsl_trap; }
 
+typedef const slang_node_t* node_ptr;
+typedef int(*NodeAction)(const slang_node_t*, struct HLSLContext*);
+
+int handleNode(const slang_node_t* ast_node, HLSLContext* ctx);
+
 struct HLSLContext {
+
     FILE* output = nullptr;
-    bool deferRegisterSemanticNodes = false;
     bool disableExtDeclaratorTerminator = false;
     int currentRegType = 0;
-    std::vector<const slang_node_t*> registerNodeList;
+
+    bool deferringRegisterSemanticNodes() const { return deferRegisterSemanticNodes && !tmpAllowRegisterSemanticNodes; }
+    void startRegisterStack() {
+        registerStackStart.push(registerNodeList.size());
+        deferRegisterSemanticNodes = true;
+    }
+    void pushRegisterNode(node_ptr n) {
+        registerNodeList.push_back(n);
+    }
+    int endRegisterStack() {
+        size_t start = registerStackStart.top();
+        size_t count = registerNodeList.size() - start;
+        deferRegisterSemanticNodes = false;
+        if (count > 0) {
+            for (auto& i = registerNodeList.begin() + start; i != registerNodeList.end(); ++i) {
+                if (int err = handleNode(*i, this)) return err;
+            }
+            registerNodeList.resize(start);
+        }
+        registerStackStart.pop();
+        deferRegisterSemanticNodes = registerStackStart.size() > 0;
+        return 0;
+    }
+
+private:
+    bool tmpAllowRegisterSemanticNodes = false;
+    bool deferRegisterSemanticNodes = false;
+    std::stack<size_t> registerStackStart;
+    std::vector<node_ptr> registerNodeList;
 };
 
-typedef int (*NodeAction)(const slang_node_t*, HLSLContext*);
 static NodeAction nodeActionTable[NULL_NODE];
 
+const char* getTypename(int token);
+
 static int handleNode(const slang_node_t* ast_node, HLSLContext* ctx) {
-    if (!nodeActionTable[ast_node->tokentype])
+    if (!nodeActionTable[ast_node->tokentype]) { 
+        fprintf(stderr, "Unhandled node type \"%s\" (%d)\n", getTypename(ast_node->tokentype), ast_node->tokentype);
         return -1;
+    }
     return nodeActionTable[ast_node->tokentype](ast_node, ctx);
 }
 
@@ -75,8 +112,6 @@ static int handleChildNodesNotOfType(const slang_node_t* ast_node, HLSLContext* 
     return 0;
 }
 
-const char* getTypename(int token);
-
 static void initialiseActionTable() {
     auto skipAndProcessChildren = [](const slang_node_t* node, HLSLContext* ctx) {
         if (int err = handleChildNodes(node, ctx)) return err;
@@ -107,13 +142,21 @@ static void initialiseActionTable() {
         if (int err = handleChildNodes(node, ctx)) return err;
         return 0;
     };
+    nodeActionTable[DEC_OP] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "--");
+        if (int err = handleChildNodes(node, ctx)) return err;
+        return 0;
+    };
     nodeActionTable['*'] =
+    nodeActionTable['/'] =
     nodeActionTable['+'] =
     nodeActionTable['-'] =
-    nodeActionTable['='] = 
+    nodeActionTable['<'] = 
+    nodeActionTable['>'] = 
+    nodeActionTable['='] =
     [](const slang_node_t* node, HLSLContext* ctx) {
         if (int err = handleNode(node->firstChild, ctx)) return err;
-        fprintf(ctx->output, "%c", (char)node->tokentype);
+        fprintf(ctx->output, "%c ", (char)node->tokentype);
         if (int err = handleNode(node->firstChild->siblingNext, ctx)) return err;
         slang2hlsl_validate(ctx, node->firstChild->siblingNext == node->firstChild->siblingPrev, "assignment/'=' nodes should alwasy have only two children.");
         return 0;
@@ -233,8 +276,8 @@ static void initialiseActionTable() {
     };
     nodeActionTable[REGISTER] = // TODO: handle register correctly
     [](const slang_node_t* node, HLSLContext* ctx) { 
-        if (ctx->deferRegisterSemanticNodes) {
-            ctx->registerNodeList.push_back(node);
+        if (ctx->deferringRegisterSemanticNodes()) {
+            ctx->pushRegisterNode(node);
         } else {
             char registerType[] = { 'c' };
             char offset[] = {'x', 'y', 'z', 'w'};
@@ -325,10 +368,15 @@ static void initialiseActionTable() {
         return 0;
     };
     nodeActionTable[EXTERNAL_DECLARATION_SPECIFIERS] = [](const slang_node_t* node, HLSLContext* ctx) {
-        slang_tokentype child_order[] = { REGISTER, SEMANTIC };
-        if (int err = handleChildNodesNotOfType(node, ctx, child_order)) return err;
-        if (int err = handleChildNodesOfType(node, ctx, REGISTER)) return err;
-        if (int err = handleChildNodesOfType(node, ctx, SEMANTIC)) return err;
+        //ctx->startRegisterStack();
+        if (int err = handleChildNodes(node, ctx)) return err;
+        //if (int err = ctx->endRegisterStack()) return err;
+        return 0;
+    };
+    nodeActionTable[CBUFFER_OR_TBUFFER_SPECIFIERS] = [](const slang_node_t* node, HLSLContext* ctx) {
+        ctx->startRegisterStack();
+        if (int err = handleChildNodes(node, ctx)) return err;
+        if (int err = ctx->endRegisterStack()) return err;
         return 0;
     };
     nodeActionTable[DECLARATION_SPECIFIERS] = skipAndProcessChildren;
@@ -336,22 +384,21 @@ static void initialiseActionTable() {
     nodeActionTable[VARIABLE_DECLARATION] = 
     nodeActionTable[EXTERNAL_VARIABLE_DECLARATION] =
     [](const slang_node_t* node, HLSLContext* ctx) {
-        ctx->deferRegisterSemanticNodes = true;
+        ctx->startRegisterStack();
         if (int err = handleChildNodes(node, ctx)) return err;
-        ctx->deferRegisterSemanticNodes = false;
-        for (const auto& i : ctx->registerNodeList) {
-            handleNode(i, ctx);
-        }
-        ctx->registerNodeList.clear();
+        if (int err = ctx->endRegisterStack()) return err;
         fprintf(ctx->output, ";\n");
         return 0;
     };
     nodeActionTable[CBUFFER_TBUFFER_DECL] = [](const slang_node_t* node, HLSLContext* ctx) {
         fprintf(ctx->output, "%s ", getTypename(CBUFFER));
-        slang_tokentype child_order[] = { IDENTIFIER, REGISTER };
-        handleChildNodesOfType(node, ctx, child_order[0]);
-        handleChildNodesOfType(node, ctx, child_order[1]);
-        handleChildNodesNotOfType(node, ctx, child_order);
+        ctx->startRegisterStack();
+        slang_tokentype child_order[] = { BUFFER_MEMBER_DECLARATION_LIST };
+        if (int err = handleChildNodesNotOfType(node, ctx, child_order)) return err;
+        if (int err = ctx->endRegisterStack()) return err;
+        for (const auto& i : child_order) {
+            if (int err = handleChildNodesOfType(node, ctx, i)) return err;
+        }
         fprintf(ctx->output, ";\n");
         return 0;
     };
@@ -370,15 +417,15 @@ static void initialiseActionTable() {
     nodeActionTable[BUFFER_SPECIFIER_QUALIFIER_LIST] =
     nodeActionTable[STRUCT_SPECIFIER_QUALIFIER_LIST] =
     [](const slang_node_t* node, HLSLContext* ctx) {
-        slang_tokentype first_childs[] = {SEMANTIC};
-        handleChildNodesNotOfType(node, ctx, first_childs);
-        handleChildNodesOfType(node, ctx, SEMANTIC);
+        ctx->startRegisterStack();
+        if (int err = handleChildNodes(node, ctx)) return err;
+        if (int err = ctx->endRegisterStack()) return err;
         fprintf(ctx->output, ";\n");
         return 0;
     };
     nodeActionTable[SEMANTIC] = [](const slang_node_t* node, HLSLContext* ctx) {
-        if (ctx->deferRegisterSemanticNodes) {
-            ctx->registerNodeList.push_back(node);
+        if (ctx->deferringRegisterSemanticNodes()) {
+            ctx->pushRegisterNode(node);
         } else {
             fprintf(ctx->output, ": %s(%s) ", getTypename(node->tokentype), node->ident);
         }
@@ -390,7 +437,83 @@ static void initialiseActionTable() {
         fprintf(ctx->output, "}\n");
         return 0;
     };
+    nodeActionTable[PARENTHESIZE] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "(");
+        if (int err = handleChildNodes(node, ctx)) return err;
+        fprintf(ctx->output, ")");
+        return 0;
+    };
     nodeActionTable[BLOCK_ITEM_LIST] = skipAndProcessChildren;
+    nodeActionTable[FOR] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "for(");
+        if (int err = handleNode(node->forLoop.start, ctx)) return err;
+        if (int err = handleNode(node->forLoop.loop_check, ctx)) return err;
+        if (int err = handleNode(node->forLoop.iter, ctx)) return err;
+        fprintf(ctx->output, ")");
+        if (int err = handleNode(node->forLoop.statements, ctx)) return err;
+        return 0;
+    };
+    nodeActionTable[DO] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "do\n");
+        if (int err = handleNode(node->whileLoop.statements, ctx)) return err;
+        fprintf(ctx->output, "while(");
+        if (int err = handleNode(node->whileLoop.expression, ctx)) return err;
+        fprintf(ctx->output, ");\n");
+        return 0;
+    };
+    nodeActionTable[WHILE] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "while(");
+        if (int err = handleNode(node->whileLoop.expression, ctx)) return err;
+        fprintf(ctx->output, ")");
+        if (int err = handleNode(node->whileLoop.statements, ctx)) return err;
+        return 0;
+    };
+    nodeActionTable[IF] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "if(");
+        if (int err = handleNode(node->ifNode.test, ctx)) return err;
+        fprintf(ctx->output, ")");
+        if (int err = handleNode(node->ifNode.statements, ctx)) return err;
+        if (node->ifNode.elseClause) {
+            if (int err = handleNode(node->ifNode.elseClause, ctx)) return err;
+        }
+        return 0;
+    };
+    nodeActionTable[ELSE] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "else ");
+        if (int err = handleNode(node->elseNode.statements,ctx)) return err;
+        return 0;
+    };
+    nodeActionTable[SWITCH] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "switch(");
+        if (int err = handleNode(node->switchNode.test,ctx)) return err;
+        fprintf(ctx->output, ")");
+        if (int err = handleNode(node->switchNode.statements, ctx)) return err;
+        return 0;
+    };
+    nodeActionTable[CASE] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "case ");
+        if (int err = handleNode(node->caseNode.constant, ctx)) return err;
+        fprintf(ctx->output, ": ");
+        if (int err = handleNode(node->caseNode.statements, ctx)) return err;
+        return 0;
+    };
+    nodeActionTable[DEFAULT] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "default:");
+        if (int err = handleNode(node->defaultCaseNode.statements, ctx)) return err;
+        return 0;
+    };
+    nodeActionTable[BREAK] = [](const slang_node_t* node, HLSLContext* ctx) {
+        fprintf(ctx->output, "break;\n");
+        return 0;
+    };
+    nodeActionTable[TERNARY_OPERATOR] = [](const slang_node_t* node, HLSLContext* ctx) {
+        if (int err = handleNode(node->ternaryOperator.test, ctx)) return err;
+        fprintf(ctx->output, "? ");
+        if (int err = handleNode(node->ternaryOperator.trueClause, ctx)) return err;
+        fprintf(ctx->output, ": ");
+        if (int err = handleNode(node->ternaryOperator.falseClause, ctx)) return err;
+        return 0;
+    };
 }
 
 extern "C" __declspec(dllexport) int process_slang_ast(const slang_node_t* ast_root, FILE* output) {
@@ -612,9 +735,17 @@ const char* typenames[] = {
     "typedef_name", // = 456,
     "enumeration_constant", // = 457,
     "ternary_operator", // = 458,
-    "null_node", // = 459
+    "EXPRESSION_STATEMENT", // = 459,
+    "VARIABLE_DECLARATION", // = 460,
+    "PARENTHESIZE", // = 461
+    "NULL_NODE", // = 462
 };
 
 const char* getTypename(int token) {
+    if (token > NULL_NODE) {
+        return "(Token type out of range.)";
+    } else if (token < IDENTIFIER) {
+        return "(Token type out of range or raw character)";
+    }
     return typenames[token - IDENTIFIER]; 
 }

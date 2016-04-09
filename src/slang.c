@@ -535,7 +535,8 @@ static const char* token_type_name [] = {
     "TERNARY_OPERATOR",// = 458,
     "EXPRESSION_STATEMENT",// = 459,
     "VARIABLE_DECLARATION",// = 460,
-    "NULL_NODE",// = 461
+    "PARENTHESIZE",// = 461,
+    "NULL_NODE",// = 462
 };
 
 void print_slang_node_and_children(slang_node_t* ast_node, FILE* out) {
