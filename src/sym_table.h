@@ -10,6 +10,7 @@ extern "C" {
 /* 
     returns type from symbol table
 */
+int slang_init_sym_table();
 int slang_sym_table_check(const char* );
 void slang_sym_type_add(const char*);
 void slang_sym_type_remove(const char*);

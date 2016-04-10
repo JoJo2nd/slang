@@ -46,6 +46,8 @@ struct TestStruct {
     float4 mem13;
 } const_input_0;
 
+TestStruct struct_intput_1;
+
 struct VSInput {
     semantic(POSITION) float3 position;
     semantic(TEXCOORD0) float4 colour;

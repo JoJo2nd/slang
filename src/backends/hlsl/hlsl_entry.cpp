@@ -118,7 +118,9 @@ static void initialiseActionTable() {
         return 0;
     };
 
-    nodeActionTable[IDENTIFIER] = [](const slang_node_t* node, HLSLContext* ctx) {
+    nodeActionTable[IDENTIFIER] =
+    nodeActionTable[TYPE_NAME] =
+    [](const slang_node_t* node, HLSLContext* ctx) {
         fprintf(ctx->output, "%s ", node->ident);
         if (int err = handleChildNodes(node, ctx)) return err;
         return 0;

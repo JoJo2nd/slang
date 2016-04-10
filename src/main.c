@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "getopt.h"
+#include "sym_table.h"
 #include "slang.h"
 #include "slang.tab.h"
 
@@ -14,6 +15,7 @@
 #define YYLTYPE SLANG_LTYPE
 
 #include "slang.yy.h"
+
 
 uintptr_t loadLibrary(const char* library);
 uintptr_t findProcessAddress(uintptr_t lib, const char* proc_name);
@@ -40,6 +42,8 @@ int main(int argc, char** argv) {
             exit(-1);
         }
     }
+
+    slang_init_sym_table();
 
     slang_parse_context_t context = {0};
 

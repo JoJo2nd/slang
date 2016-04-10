@@ -543,6 +543,8 @@ void print_slang_node_and_children(slang_node_t* ast_node, FILE* out) {
     if (ast_node) {
         if (ast_node->tokentype == IDENTIFIER) {
             fprintf(out, " \"%p\" [label=\"IDENTIFER:%s\"]\n", ast_node, ast_node->ident);
+        } if (ast_node->tokentype == TYPE_NAME) {
+            fprintf(out, " \"%p\" [label=\"TYPE:%s\"]\n", ast_node, ast_node->ident);
         } else if (ast_node->tokentype == INTCONSTANT) {
             fprintf(out, " \"%p\" [label=\"%d\"]\n", ast_node, ast_node->int_const);
         } else if (ast_node->tokentype == FLOATCONSTANT) {

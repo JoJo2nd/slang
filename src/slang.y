@@ -602,7 +602,7 @@ type_specifier
     : scalar_type_specifier { $$ = $1; }
     | sampler_type_specifier { $$ = $1; }
     | struct_declaration { $$ = $1; }
-    | TYPE_NAME { $$ = new_slang_identifier($1); }
+    | TYPE_NAME { $$ = new_slang_node(TYPE_NAME); $$->ident = $1; }
     ;
 
 type_name
