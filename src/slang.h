@@ -62,10 +62,8 @@ typedef struct slang_node {
             struct slang_node* semantic;
         } structMemberDecl;
         struct {
-            struct slang_node* typeSpecifiers;
-            struct slang_node* identifier;
-            struct slang_node* args;
-            struct slang_node* semantic;
+            struct slang_node* declarationSpecifiers;
+            struct slang_node* declarator;
             struct slang_node* body;
         } functionDecl;
         struct {
@@ -154,11 +152,6 @@ slang_node_t* new_slang_buffer_member_decl(
 slang_node_t* new_slang_function_arg(
     slang_node_t* type_specifier,
     slang_node_t* identifier,
-    slang_node_t* semantic);
-slang_node_t* new_slang_function_declarator(
-    slang_node_t* type_specifier,
-    slang_node_t* identifier,
-    slang_node_t* args,
     slang_node_t* semantic);
 slang_node_t* new_slang_while_node(
     slang_node_t* expression,

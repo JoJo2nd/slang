@@ -304,7 +304,7 @@ static void initialiseActionTable() {
         return 0;
     };
     nodeActionTable[TRANSLATION_UNIT] = [](const slang_node_t* node, HLSLContext* ctx) {
-        fprintf(ctx->output, "/**\nAuto generated HLSL code from slangc.\n**/\n");
+        fprintf(ctx->output, "/**\nAuto generated HLSL code from slang2hlsl.\n**/\n");
         return handleChildNodes(node, ctx);
     };
     nodeActionTable[INITIALIZER_LIST] = [](const slang_node_t* node, HLSLContext* ctx) {
@@ -327,8 +327,10 @@ static void initialiseActionTable() {
         slang_node_t* child = node->firstChild;
         if (child) {
             do {
+                ctx->startRegisterStack();
                 if (int err = handleNode(child, ctx)) return err;
                 child = child->siblingNext;
+                ctx->endRegisterStack();
                 if (child != node->firstChild) {
                     fprintf(ctx->output, ", ");
                 }
@@ -370,15 +372,21 @@ static void initialiseActionTable() {
         return 0;
     };
     nodeActionTable[EXTERNAL_DECLARATION_SPECIFIERS] = [](const slang_node_t* node, HLSLContext* ctx) {
-        //ctx->startRegisterStack();
         if (int err = handleChildNodes(node, ctx)) return err;
-        //if (int err = ctx->endRegisterStack()) return err;
         return 0;
     };
     nodeActionTable[CBUFFER_OR_TBUFFER_SPECIFIERS] = [](const slang_node_t* node, HLSLContext* ctx) {
         ctx->startRegisterStack();
         if (int err = handleChildNodes(node, ctx)) return err;
         if (int err = ctx->endRegisterStack()) return err;
+        return 0;
+    };
+    nodeActionTable[FUNCTION_DEFINITION] = [](const slang_node_t* node, HLSLContext* ctx) {
+        ctx->startRegisterStack();
+        if (int err = handleNode(node->functionDecl.declarationSpecifiers, ctx)) return err;
+        if (int err = handleNode(node->functionDecl.declarator, ctx)) return err;
+        ctx->endRegisterStack();
+        if (int err = handleNode(node->functionDecl.body, ctx)) return err;
         return 0;
     };
     nodeActionTable[DECLARATION_SPECIFIERS] = skipAndProcessChildren;
@@ -740,7 +748,8 @@ const char* typenames[] = {
     "EXPRESSION_STATEMENT", // = 459,
     "VARIABLE_DECLARATION", // = 460,
     "PARENTHESIZE", // = 461
-    "NULL_NODE", // = 462
+    "FUNCTION_DEFINITION", // = 462
+    "NULL_NODE", // = 463
 };
 
 const char* getTypename(int token) {

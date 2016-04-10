@@ -252,28 +252,6 @@ slang_node_t* new_slang_function_arg(
     }
     return fna;
 }
-slang_node_t* new_slang_function_declarator(
-    slang_node_t* type_specifier,
-    slang_node_t* identifier,
-    slang_node_t* args,
-    slang_node_t* semantic) {
-    slang_node_t* fn = init_slang_node(malloc(sizeof(slang_node_t)));
-    fn->tokentype = FUNCTION;
-    slang_assert(type_specifier && identifier);
-    slang_node_attach_child(fn, type_specifier);
-    fn->functionDecl.typeSpecifiers = type_specifier;
-    slang_node_attach_child(fn, identifier);
-    fn->functionDecl.identifier = identifier;
-    if (args) {
-        fn->functionDecl.args = args;
-        slang_node_attach_child(fn, args);
-    }
-    if (semantic) {
-        slang_node_attach_child(fn, semantic);
-        fn->functionDecl.semantic = semantic;
-    }
-    return fn;
-}
 
 slang_node_t* new_slang_while_node(
     slang_node_t* expression,
@@ -536,7 +514,8 @@ static const char* token_type_name [] = {
     "EXPRESSION_STATEMENT",// = 459,
     "VARIABLE_DECLARATION",// = 460,
     "PARENTHESIZE",// = 461,
-    "NULL_NODE",// = 462
+    "FUNCTION_DEFINITION", // = 462
+    "NULL_NODE", // = 463
 };
 
 void print_slang_node_and_children(slang_node_t* ast_node, FILE* out) {

@@ -293,6 +293,7 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 %token EXPRESSION_STATEMENT
 %token VARIABLE_DECLARATION
 %token PARENTHESIZE
+%token FUNCTION_DEFINITION
 
 %token NULL_NODE
 
@@ -496,7 +497,13 @@ function_arg
     ;
 
 function_definition
-    : external_declaration_specifiers declarator compound_statement { $$ = $1; slang_node_attach_children($$, $2, $3, NULL); };
+    : external_declaration_specifiers declarator compound_statement {
+        $$ = new_slang_node(FUNCTION_DEFINITION);
+        $$->functionDecl.declarationSpecifiers = $1;
+        $$->functionDecl.declarator = $2;
+        $$->functionDecl.body = $3;
+        slang_node_attach_children($$, $1, $2, $3, NULL);
+    };
     ;
 
 scalar_type_specifier
