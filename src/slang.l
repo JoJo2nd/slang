@@ -12,7 +12,18 @@
 
 
 #define YY_EXTRA_TYPE slang_parse_context_t*
-#define YY_USER_ACTION yylloc->first_line = yylineno;
+#define YY_USER_ACTION \
+    yylloc->first_line = yylloc->last_line; \
+    yylloc->first_column = yylloc->last_column; \
+    for(int i = 0; yytext[i] != '\0'; i++) { \
+        if(yytext[i] == '\n') { \
+            yylloc->last_line++; \
+            yylloc->last_column = 0; \
+        } \
+        else { \
+            yylloc->last_column++; \
+        } \
+    }
 
 #define YYSTYPE SLANG_STYPE
 #define YYLTYPE SLANG_LTYPE
@@ -63,9 +74,7 @@ floating_constant   {digit}+\.{digit}+
 
 vs return VS;
 ps return PS;
-gs return GS;
-ds return DS;
-hs return HS;
+cs return CS;
 
 void        return VOID;
 
@@ -269,7 +278,7 @@ false           { return FALSE_VALUE; }
 {integer_constant}  { yylval->intConst = atoi(yytext); return INTCONSTANT; }
 {floating_constant} { yylval->floatConst = atof(yytext); return FLOATCONSTANT; }
 
-\n					{ ++yyg->yylineno_r; }
+\n					{ /*++yyg->yylineno_r;*/  }
 {WS}+               { /* whitespace separates tokens */ }
 .                   { /* discard bad characters */ }
 
@@ -277,7 +286,7 @@ false           { return FALSE_VALUE; }
 
 void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) {
 	struct yyguts_t * yyg = (struct yyguts_t*)context->scanner;
-    fprintf(stderr, "ERROR: %s around '%s' (%d:%d)", err, yytext, slang_get_lineno(context->scanner), slang_get_column(context->scanner));
+    fprintf(stderr, "ERROR: %s around '%s' (%d:%d)\n", err, yytext, locp->first_line, locp->first_column);
 }
 
 void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context) {

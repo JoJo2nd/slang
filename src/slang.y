@@ -265,9 +265,7 @@ void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* 
 
 %token VS
 %token PS
-%token GS
-%token DS
-%token HS
+%token CS
 
 %token TRANSLATION_UNIT 
 %token COMPOUND_STATEMENT BLOCK_ITEM_LIST
@@ -375,8 +373,10 @@ declarator
     : IDENTIFIER { $$ = new_slang_node(DECLARATOR); $$->declarator.ident = slang_copy_string($1); $$->declarator.arraySize = 1; }
     | declarator '[' ']' { $$ = $1; $1->declarator.arraySize = 0; }
     | declarator '[' assignment_expression ']' { $$ = $1; $1->declarator.arraySizeChild = $3; slang_node_attach_child($1, $3); }
+    | declarator '[' error ']' { $$ = new_slang_node(NULL_NODE); }
     | declarator '(' function_args_list ')' { $$ = $1; $1->declarator.function_prototype = true; slang_node_attach_child($1, $3); }
     | declarator '(' ')' { $$ = $1; $1->declarator.function_prototype = true; slang_node_attach_child($1, new_slang_node(FUNCTION_ARG_LIST));}
+    | declarator '(' error ')' { $$ = new_slang_node(NULL_NODE); }
     ;
 
 type_modifier // aka storage_qualifier
@@ -389,6 +389,7 @@ type_modifier // aka storage_qualifier
 
 semantic
     : SEMANTIC '(' IDENTIFIER ')' { $$ = new_slang_semantic($3); }
+    | SEMANTIC '(' error ')' { $$ = new_slang_node(NULL_NODE); }
     ;
 
 register
@@ -396,6 +397,7 @@ register
     | REGISTER '(' shader_profile ',' INTCONSTANT ')' { $$ = new_slang_register_constant($3, $5, 0); }
     | REGISTER '(' INTCONSTANT ',' INTCONSTANT ')' { $$ = new_slang_register_constant(NULL, $3, $5); }
     | REGISTER '(' INTCONSTANT ')' { $$ = new_slang_register_constant(NULL, $3, 0); }
+    | REGISTER '(' error ')' { $$ = new_slang_node(NULL_NODE); }
     ;
 
 interpolation_modifier
@@ -436,6 +438,7 @@ buffer_member_declaration
 buffer_member_declaration_list
     : buffer_member_declaration ';' { $$ = new_slang_node(BUFFER_MEMBER_DECLARATION_LIST); slang_node_attach_child($$, $1); }
     | buffer_member_declaration_list buffer_member_declaration ';' { $$ = $1; slang_node_attach_child($1, $2); }
+    | error ';' { $$ = new_slang_node(NULL_NODE); }
     ;
 
 buffer_specifier_qualifier_list
@@ -622,9 +625,7 @@ type_name
 shader_profile
     : VS { $$ = new_slang_node(VS); }
     | PS { $$ = new_slang_node(PS); }
-    | GS { $$ = new_slang_node(GS); }
-    | DS { $$ = new_slang_node(DS); }
-    | HS { $$ = new_slang_node(HS); }
+    | CS { $$ = new_slang_node(CS); }
     ;
 
 statement
