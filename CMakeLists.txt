@@ -89,6 +89,7 @@ set( LINK_DIRS
 file(GLOB SRC_FILES 
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 file(GLOB FLEX_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.l"

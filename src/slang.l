@@ -10,7 +10,6 @@
 #include "slang.h"
 #include "sym_table.h"
 
-
 #define YY_EXTRA_TYPE slang_parse_context_t*
 #define YY_USER_ACTION \
     yylloc->first_line = yylloc->last_line; \
@@ -37,6 +36,7 @@ int slang_lex(SLANG_STYPE* lvalp, SLANG_LTYPE* llocp, void* scanner);
 void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err);
 
 void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context);
+void parse_line_directive(yyscan_t yyscanner, slang_parse_context_t* context);
 
 #ifdef _MSC_VER
 #   pragma warning( disable : 4996 )
@@ -53,6 +53,8 @@ void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context);
 %option noyywrap
 /* Want line no support*/
 %option yylineno
+%option never-interactive
+/*%option nounistd*/
 
 ES                  (\\(['"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
 WS                  [ \t\v\n\f]
@@ -69,6 +71,7 @@ floating_constant   {digit}+\.{digit}+
 
 "//".*                                    { /* consume //-comment TODO: /* style comments... */ }
 "/*"									  { skip_comment(yyscanner, yyextra); }
+"#line".*								  { parse_line_directive(yyscanner, yyextra); }
 
 (\"([^"\\\n]|{ES})*\"{WS}*)+   { yylval->strLiteral = strdup(yytext); return STRING_LITERAL; }
 
@@ -286,7 +289,7 @@ false           { return FALSE_VALUE; }
 
 void slang_error(SLANG_LTYPE* locp, slang_parse_context_t* context, const char* err) {
 	struct yyguts_t * yyg = (struct yyguts_t*)context->scanner;
-    fprintf(stderr, "ERROR: %s around '%s' (%d:%d)\n", err, yytext, locp->first_line, locp->first_column);
+    fprintf(stderr, "%s(%d:%d) error: %s around '%s'\n", context->current_file, locp->first_line, locp->first_column, err, yytext);
 }
 
 void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context) {
@@ -301,4 +304,28 @@ void skip_comment(yyscan_t yyscanner, slang_parse_context_t* context) {
         if (c == 0) break;
     }
     slang_error(yylloc, context, "EOF in comment");
+}
+
+void parse_line_directive(yyscan_t yyscanner, slang_parse_context_t* context) {
+	struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
+	unsigned int line_no;
+	sscanf(yytext, "#line %u", &line_no);
+	yylloc->first_line = yylloc->last_line = line_no-1;
+    yylloc->first_column = yylloc->last_column = 0;
+	int space_count = 0;
+	for (unsigned int i = 0; yytext[i]; ++i) {
+		if (space_count == 2) {
+			free(context->current_file);
+			context->current_file = strdup(yytext+i+1);
+			for (unsigned int j = 0; context->current_file[j]; ++j) {
+				if (context->current_file[j] == '"') {
+					context->current_file[j] = '\0';
+					break;
+				}
+			}
+			break;
+		}
+		if (yytext[i] == ' ') ++space_count;
+	}
+	//fprintf(stderr, "line directive %s", yytext);
 }

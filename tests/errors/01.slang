@@ -4,6 +4,9 @@
  */
 // 01.slang
 
+#include "test_view_include.slang"
+#include "test_view_include.slang"
+
 register(vs, 0) register(ps, 1) 
 register(cs, 0, 1, 2) //error unexpected ','
 cbufffer const_buf_1 { // error unexpected 'cbufffer'

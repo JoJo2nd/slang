@@ -112,6 +112,7 @@ typedef struct slang_node {
 
 
 typedef struct slang_parse_context {
+    char* current_file;
     slang_node_t* root;
     void *scanner; //Opaque handle to lexer context
     FILE* fin;
